@@ -123,29 +123,23 @@ install_gateway() {
     # Label namespace for sidecar injection
     kubectl label namespace "${ISTIO_INGRESS_NAMESPACE}" istio-injection=enabled --overwrite
 
-    # Gateway chart has strict schema validation - use --set flags for k3d customizations
-    # Defaults: LoadBalancer, ports 80/443/15021, autoscaling 1-5, 100m/128Mi resources
-    local gateway_args=(
-        --set autoscaling.enabled=false
-        --set replicaCount=1
-        --set resources.requests.cpu=10m
-        --set resources.requests.memory=64Mi
-        --set resources.limits.cpu=200m
-        --set resources.limits.memory=256Mi
-    )
+    # Gateway chart has strict schema validation that rejects most customizations.
+    # Using chart defaults which are suitable for k3d:
+    # - service.type: LoadBalancer (works with k3d port mappings)
+    # - ports: 80, 443, 15021 (standard Istio gateway ports)
+    # - autoscaling: enabled 1-5 replicas
+    # - resources: 100m/128Mi requests (reasonable for k3d)
 
     if release_exists "istio-ingress" "${ISTIO_INGRESS_NAMESPACE}"; then
         log_info "istio-ingress already installed, upgrading..."
         helm upgrade istio-ingress istio/gateway \
             -n "${ISTIO_INGRESS_NAMESPACE}" \
             --version "${ISTIO_VERSION}" \
-            "${gateway_args[@]}" \
             --wait --timeout 5m
     else
         helm install istio-ingress istio/gateway \
             -n "${ISTIO_INGRESS_NAMESPACE}" \
             --version "${ISTIO_VERSION}" \
-            "${gateway_args[@]}" \
             --wait --timeout 5m
     fi
 }
