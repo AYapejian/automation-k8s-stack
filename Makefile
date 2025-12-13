@@ -1,7 +1,10 @@
-.PHONY: help cluster-up cluster-down test lint clean
+.PHONY: help cluster-up cluster-down cluster-status test lint clean
 
 # Default target
 .DEFAULT_GOAL := help
+
+# Directories
+SCRIPTS_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))/scripts
 
 ##@ General
 
@@ -10,13 +13,25 @@ help: ## Show this help message
 
 ##@ Cluster Management
 
-cluster-up: ## Create KIND cluster (idempotent)
-	@echo "TODO: Implement in Phase 1.2"
-	@exit 1
+cluster-up: ## Create k3d cluster with local registry (idempotent)
+	@$(SCRIPTS_DIR)/cluster-up.sh
 
-cluster-down: ## Destroy KIND cluster (idempotent)
-	@echo "TODO: Implement in Phase 1.2"
-	@exit 1
+cluster-down: ## Destroy k3d cluster and registry (idempotent)
+	@$(SCRIPTS_DIR)/cluster-down.sh
+
+cluster-status: ## Show cluster status
+	@echo "Checking cluster status..."
+	@k3d cluster list 2>/dev/null | grep -q "automation-k8s" && \
+		echo "Cluster: automation-k8s" && \
+		k3d cluster list 2>/dev/null | grep "automation-k8s" && \
+		echo "" && \
+		kubectl get nodes -o wide 2>/dev/null || \
+		echo "Cluster: automation-k8s (not found)"
+	@echo ""
+	@k3d registry list 2>/dev/null | grep -q "registry.localhost" && \
+		echo "Registry:" && \
+		k3d registry list 2>/dev/null | grep "registry.localhost" || \
+		echo "Registry: not running"
 
 ##@ Testing
 
