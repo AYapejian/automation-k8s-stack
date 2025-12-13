@@ -1,0 +1,45 @@
+# cert-manager Helm values for k3d development
+# https://artifacthub.io/packages/helm/cert-manager/cert-manager
+#
+# Deploys cert-manager for TLS certificate management.
+# Uses reduced resources suitable for k3d development environment.
+
+# Install CRDs as part of Helm release
+crds:
+  enabled: true
+  keep: false  # Remove CRDs on uninstall for clean teardown
+
+# Reduced resources for k3d
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+# Webhook configuration
+webhook:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# CA injector (needed for self-signed certs)
+cainjector:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# Prometheus metrics (for Phase 3 observability)
+prometheus:
+  enabled: true
+  servicemonitor:
+    enabled: false  # Enable in Phase 3.1 when Prometheus is deployed

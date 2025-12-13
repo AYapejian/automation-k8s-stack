@@ -1,0 +1,40 @@
+# Shared Istio Gateway for TLS ingress
+# All VirtualServices reference this gateway to route traffic
+#
+# This Gateway handles:
+# - HTTP (port 80): Redirects to HTTPS
+# - HTTPS (port 443): TLS termination with cert-manager certificate
+#
+# Traffic flow:
+# localhost:8080 -> k3d -> LoadBalancer -> Gateway (port 80) -> HTTPS redirect
+# localhost:8443 -> k3d -> LoadBalancer -> Gateway (port 443) -> VirtualService -> App
+
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: main-gateway
+  namespace: istio-ingress
+spec:
+  selector:
+    istio: ingress  # Matches istio-ingress deployment labels
+  servers:
+    # HTTP server - redirects all traffic to HTTPS
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"
+      tls:
+        httpsRedirect: true
+
+    # HTTPS server - TLS termination
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - "*"
+      tls:
+        mode: SIMPLE
+        credentialName: gateway-tls-secret  # Created by Certificate resource

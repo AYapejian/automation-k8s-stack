@@ -1,0 +1,8 @@
+# Namespace for sample ingress application
+# Labeled for Istio sidecar injection
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-sample
+  labels:
+    istio-injection: enabled
