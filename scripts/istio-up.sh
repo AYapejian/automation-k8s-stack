@@ -32,6 +32,14 @@ check_prerequisites() {
         exit 1
     fi
 
+    # Check helm version (requires 3.x)
+    local helm_version
+    helm_version=$(helm version --short 2>/dev/null | grep -oE 'v[0-9]+' | head -1 | cut -c2-)
+    if [[ -n "${helm_version}" ]] && [[ "${helm_version}" -lt 3 ]]; then
+        log_error "Helm 3.x is required (found v${helm_version})"
+        exit 1
+    fi
+
     # Check if cluster is accessible
     if ! kubectl cluster-info >/dev/null 2>&1; then
         log_error "Cannot connect to Kubernetes cluster. Is the cluster running?"
@@ -49,7 +57,7 @@ check_prerequisites() {
 # Add Istio Helm repository
 setup_helm_repo() {
     log_info "Setting up Istio Helm repository..."
-    if helm repo list 2>/dev/null | grep -q "^istio"; then
+    if helm repo list 2>/dev/null | grep -qE "^istio[[:space:]]"; then
         helm repo update istio >/dev/null
     else
         helm repo add istio https://istio-release.storage.googleapis.com/charts
@@ -115,18 +123,29 @@ install_gateway() {
     # Label namespace for sidecar injection
     kubectl label namespace "${ISTIO_INGRESS_NAMESPACE}" istio-injection=enabled --overwrite
 
+    # Gateway chart has strict schema validation - use --set flags for k3d customizations
+    # Defaults: LoadBalancer, ports 80/443/15021, autoscaling 1-5, 100m/128Mi resources
+    local gateway_args=(
+        --set autoscaling.enabled=false
+        --set replicaCount=1
+        --set resources.requests.cpu=10m
+        --set resources.requests.memory=64Mi
+        --set resources.limits.cpu=200m
+        --set resources.limits.memory=256Mi
+    )
+
     if release_exists "istio-ingress" "${ISTIO_INGRESS_NAMESPACE}"; then
         log_info "istio-ingress already installed, upgrading..."
         helm upgrade istio-ingress istio/gateway \
             -n "${ISTIO_INGRESS_NAMESPACE}" \
             --version "${ISTIO_VERSION}" \
-            -f "${ISTIO_DIR}/gateway/values.yaml" \
+            "${gateway_args[@]}" \
             --wait --timeout 5m
     else
         helm install istio-ingress istio/gateway \
             -n "${ISTIO_INGRESS_NAMESPACE}" \
             --version "${ISTIO_VERSION}" \
-            -f "${ISTIO_DIR}/gateway/values.yaml" \
+            "${gateway_args[@]}" \
             --wait --timeout 5m
     fi
 }
