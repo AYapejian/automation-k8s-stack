@@ -26,7 +26,7 @@ test: ## Run all tests
 
 lint: ## Run linting checks
 	@echo "Checking YAML files..."
-	@find . -name '*.yaml' -o -name '*.yml' | head -1 | xargs -I {} echo "Found YAML files"
+	@find . -name '*.yaml' -o -name '*.yml' | xargs -I {} echo "Found: {}"
 	@echo "Lint check placeholder - will add yamllint in future"
 
 ##@ Cleanup
