@@ -1,0 +1,29 @@
+# NFS StorageClass for k3s production environment
+# This is a PLACEHOLDER - requires NFS CSI driver installation (Phase 6.2)
+#
+# Prerequisites for k3s:
+# 1. Install NFS CSI driver: helm install csi-driver-nfs csi-driver-nfs/csi-driver-nfs
+# 2. Configure NFS server details in a Secret
+# 3. Update provisioner parameters below
+#
+# Do NOT apply this in k3d - it won't work without the CSI driver
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nas
+  labels:
+    environment: production
+  annotations:
+    description: "NFS storage backed by NAS device - k3s production only"
+provisioner: nfs.csi.k8s.io  # Requires NFS CSI driver
+parameters:
+  # These parameters need to be configured for your NFS server
+  # server: "nas.local"
+  # share: "/volume1/kubernetes"
+reclaimPolicy: Retain  # Keep data on PVC deletion for production safety
+volumeBindingMode: Immediate  # NFS doesn't need WaitForFirstConsumer
+allowVolumeExpansion: true
+mountOptions:
+  - nfsvers=4.1
+  - hard
+  - noatime

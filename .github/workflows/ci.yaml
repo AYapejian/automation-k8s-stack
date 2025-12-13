@@ -79,6 +79,15 @@ jobs:
       # - name: Run tests
       #   run: make test
 
+      - name: Test storage provisioning
+        run: |
+          echo "Testing storage provisioning..."
+          make storage-test
+
+      - name: Cleanup storage test
+        if: always()
+        run: make storage-test-down || true
+
       - name: Cleanup
         if: always()
         run: make cluster-down
