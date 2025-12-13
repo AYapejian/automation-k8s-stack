@@ -1,0 +1,40 @@
+# Test Pod that writes to PVC to validate storage provisioning
+# Used by storage-test-up.sh
+apiVersion: v1
+kind: Pod
+metadata:
+  name: storage-test
+  namespace: default
+  labels:
+    app: storage-test
+spec:
+  containers:
+    - name: busybox
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          echo "Writing test file..."
+          echo "Storage test passed at $(date)" > /data/test.txt
+          echo "Contents of /data/test.txt:"
+          cat /data/test.txt
+          echo "Test complete. Sleeping..."
+          sleep 30
+      volumeMounts:
+        - name: data
+          mountPath: /data
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 50m
+          memory: 32Mi
+      securityContext:
+        runAsNonRoot: false  # busybox needs root for simple test
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: storage-test
+  restartPolicy: Never

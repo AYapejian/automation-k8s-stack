@@ -135,8 +135,8 @@ Each phase represents a logical unit of work. Each numbered item should be imple
 - PVC templates for apps
 
 **Acceptance Criteria**:
-- [ ] PVC dynamically provisions PV
-- [ ] Pod can mount and write to PVC
+- [x] PVC dynamically provisions PV
+- [x] Pod can mount and write to PVC
 
 ---
 

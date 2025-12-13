@@ -1,4 +1,4 @@
-.PHONY: help cluster-up cluster-down cluster-status istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status test lint clean
+.PHONY: help cluster-up cluster-down cluster-status istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status test lint clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -112,6 +112,26 @@ sample-app-status: ## Show sample app status
 	@echo ""
 	@echo "VirtualServices:"
 	@kubectl get virtualservices -n ingress-sample 2>/dev/null || echo "  (none)"
+
+##@ Storage
+
+storage-test: ## Run storage provisioning test (creates PVC, writes data)
+	@$(SCRIPTS_DIR)/storage-test-up.sh
+
+storage-test-down: ## Clean up storage test resources
+	@$(SCRIPTS_DIR)/storage-test-down.sh
+
+storage-status: ## Show StorageClasses and PVCs
+	@echo "Checking storage configuration..."
+	@echo ""
+	@echo "StorageClasses:"
+	@kubectl get storageclass 2>/dev/null || echo "  Cannot connect to cluster"
+	@echo ""
+	@echo "PersistentVolumeClaims (all namespaces):"
+	@kubectl get pvc -A 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "PersistentVolumes:"
+	@kubectl get pv 2>/dev/null || echo "  (none)"
 
 ##@ Testing
 

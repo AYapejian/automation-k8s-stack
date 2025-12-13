@@ -1,0 +1,17 @@
+# Test PVC for validating storage provisioning
+# Used by storage-test-up.sh to verify local-path-provisioner works
+#
+# Note: No storageClassName specified - uses cluster default (local-path in k3d)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-test
+  namespace: default
+  labels:
+    app: storage-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
