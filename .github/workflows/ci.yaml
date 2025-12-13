@@ -37,10 +37,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install k3d
+      - name: Install k3d and verify prerequisites
         run: |
           curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
           k3d version
+          jq --version
+          echo "All prerequisites available"
 
       - name: Create k3d cluster
         run: make cluster-up

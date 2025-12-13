@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CLUSTER_NAME="automation-k8s"
 CLUSTER_CONFIG="${REPO_ROOT}/clusters/k3d/cluster-config.yaml"
+REGISTRY_PORT="5111"
 
 # Colors for output
 RED='\033[0;31m'
@@ -24,10 +25,12 @@ check_prerequisites() {
     command -v k3d >/dev/null 2>&1 || missing+=("k3d")
     command -v kubectl >/dev/null 2>&1 || missing+=("kubectl")
     command -v docker >/dev/null 2>&1 || missing+=("docker")
+    command -v jq >/dev/null 2>&1 || missing+=("jq")
 
     if [[ ${#missing[@]} -gt 0 ]]; then
         log_error "Missing required tools: ${missing[*]}"
         log_error "Install k3d: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash"
+        log_error "Install jq: brew install jq (macOS) or apt install jq (Linux)"
         exit 1
     fi
 
@@ -46,7 +49,12 @@ check_prerequisites() {
 
 # Check if cluster already exists
 cluster_exists() {
-    k3d cluster list -o json 2>/dev/null | grep -q "\"name\":\"${CLUSTER_NAME}\""
+    k3d cluster list -o json 2>/dev/null | jq -e ".[] | select(.name == \"${CLUSTER_NAME}\")" >/dev/null 2>&1
+}
+
+# Get cluster running status
+get_cluster_servers_running() {
+    k3d cluster list -o json 2>/dev/null | jq -r ".[] | select(.name == \"${CLUSTER_NAME}\") | .serversRunning"
 }
 
 # Create k3d cluster
@@ -56,7 +64,7 @@ create_cluster() {
 
         # Ensure cluster is running
         local status
-        status=$(k3d cluster list -o json | grep -A5 "\"name\":\"${CLUSTER_NAME}\"" | grep -o '"serversRunning":[0-9]*' | cut -d: -f2)
+        status=$(get_cluster_servers_running)
 
         if [[ "${status}" == "0" ]]; then
             log_info "Starting stopped cluster..."
@@ -87,8 +95,13 @@ apply_node_labels() {
     local kubectl_cmd
     kubectl_cmd=$(get_kubectl)
 
-    # Wait for nodes to be ready
-    ${kubectl_cmd} wait --for=condition=Ready nodes --all --timeout=120s
+    # Wait for nodes to be ready with error context
+    if ! ${kubectl_cmd} wait --for=condition=Ready nodes --all --timeout=120s; then
+        log_error "Timed out waiting for nodes to be ready"
+        log_error "Node status:"
+        ${kubectl_cmd} get nodes -o wide || true
+        exit 1
+    fi
 
     # Get agent (worker) nodes
     local agents
@@ -100,12 +113,12 @@ apply_node_labels() {
             # Apply simulated hardware labels
             # In real k3s deployment, these would be on actual hardware nodes
             ${kubectl_cmd} label "${node}" node-role.kubernetes.io/worker=true --overwrite
-            ${kubectl_cmd} label "${node}" hardware/usb=false --overwrite
-            ${kubectl_cmd} label "${node}" hardware/zigbee=false --overwrite
 
-            # Mark first worker as having USB (for HomeAssistant affinity testing)
+            # Set hardware labels - first worker gets USB for HomeAssistant affinity testing
             if [[ ${i} -eq 0 ]]; then
-                ${kubectl_cmd} label "${node}" hardware/usb=true --overwrite
+                ${kubectl_cmd} label "${node}" hardware/usb=true hardware/zigbee=false --overwrite
+            else
+                ${kubectl_cmd} label "${node}" hardware/usb=false hardware/zigbee=false --overwrite
             fi
             ((i++)) || true
         done
@@ -122,21 +135,28 @@ wait_for_cluster() {
     local kubectl_cmd
     kubectl_cmd=$(get_kubectl)
 
-    # Wait for nodes
-    ${kubectl_cmd} wait --for=condition=Ready nodes --all --timeout=120s
+    # Wait for nodes with error context
+    if ! ${kubectl_cmd} wait --for=condition=Ready nodes --all --timeout=120s; then
+        log_error "Timed out waiting for nodes to be ready"
+        log_error "Node status:"
+        ${kubectl_cmd} get nodes -o wide || true
+        exit 1
+    fi
 
-    # Wait for core system pods
+    # Wait for core system pods with error context
     log_info "Waiting for system pods..."
-    ${kubectl_cmd} wait --for=condition=Ready pods --all -n kube-system --timeout=180s
+    if ! ${kubectl_cmd} wait --for=condition=Ready pods --all -n kube-system --timeout=180s; then
+        log_error "Timed out waiting for system pods"
+        log_error "Pod status:"
+        ${kubectl_cmd} get pods -n kube-system -o wide || true
+        exit 1
+    fi
 }
 
 # Print cluster info
 print_info() {
     local kubectl_cmd
     kubectl_cmd=$(get_kubectl)
-
-    local registry_port
-    registry_port=$(k3d registry list -o json 2>/dev/null | grep -o '"portMappings":"[^"]*"' | head -1 | sed 's/.*:\([0-9]*\)-.*/\1/' || echo "5111")
 
     echo ""
     log_info "=========================================="
@@ -149,10 +169,10 @@ print_info() {
     echo "Endpoints:"
     echo "  HTTP Ingress:  http://localhost:8080"
     echo "  HTTPS Ingress: https://localhost:8443"
-    echo "  Local Registry: registry.localhost:${registry_port}"
+    echo "  Local Registry: registry.localhost:${REGISTRY_PORT}"
     echo ""
     echo "To use the registry in your deployments:"
-    echo "  image: registry.localhost:${registry_port}/my-image:tag"
+    echo "  image: registry.localhost:${REGISTRY_PORT}/my-image:tag"
     echo ""
     echo "Useful commands:"
     echo "  kubectl get nodes         # List nodes"

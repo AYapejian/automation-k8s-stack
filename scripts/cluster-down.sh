@@ -48,11 +48,17 @@ check_prerequisites() {
         log_error "docker is not installed"
         exit 1
     fi
+
+    if ! command -v jq >/dev/null 2>&1; then
+        log_error "jq is not installed"
+        log_error "Install jq: brew install jq (macOS) or apt install jq (Linux)"
+        exit 1
+    fi
 }
 
-# Check if cluster exists
+# Check if cluster exists using jq for robust JSON parsing
 cluster_exists() {
-    k3d cluster list -o json 2>/dev/null | grep -q "\"name\":\"${CLUSTER_NAME}\""
+    k3d cluster list -o json 2>/dev/null | jq -e ".[] | select(.name == \"${CLUSTER_NAME}\")" >/dev/null 2>&1
 }
 
 # Delete k3d cluster
@@ -85,9 +91,14 @@ delete_registry() {
     fi
 }
 
-# Clean up kubeconfig context
+# Clean up kubeconfig context (optional - kubectl may not be installed)
 cleanup_kubeconfig() {
     local context="k3d-${CLUSTER_NAME}"
+
+    # Only attempt if kubectl is available
+    if ! command -v kubectl >/dev/null 2>&1; then
+        return 0
+    fi
 
     if kubectl config get-contexts -o name 2>/dev/null | grep -q "^${context}$"; then
         log_info "Removing kubeconfig context '${context}'..."
