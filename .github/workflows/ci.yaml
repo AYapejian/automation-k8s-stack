@@ -82,3 +82,97 @@ jobs:
       - name: Cleanup
         if: always()
         run: make cluster-down
+
+  istio-test:
+    name: Istio Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install prerequisites
+        run: |
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          k3d version
+          helm version
+          jq --version
+
+      - name: Create k3d cluster
+        run: make cluster-up
+
+      - name: Install Istio
+        run: make istio-up
+
+      - name: Verify Istio control plane
+        run: |
+          echo "Checking Istio control plane..."
+          kubectl get pods -n istio-system
+          kubectl wait --for=condition=Ready pods --all -n istio-system --timeout=120s
+          echo ""
+          echo "Checking Istio ingress gateway..."
+          kubectl get pods -n istio-ingress
+          kubectl wait --for=condition=Ready pods --all -n istio-ingress --timeout=120s
+
+      - name: Test sidecar injection
+        run: |
+          echo "Creating test namespace with injection enabled..."
+          kubectl create namespace istio-test
+          kubectl label namespace istio-test istio-injection=enabled
+
+          echo "Deploying test workload..."
+          kubectl apply -n istio-test -f - <<EOF
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: sleep
+            labels:
+              app: sleep
+          spec:
+            containers:
+            - name: sleep
+              image: curlimages/curl
+              command: ["/bin/sh", "-c", "sleep 3600"]
+          EOF
+
+          echo "Waiting for pod to be ready..."
+          kubectl wait --for=condition=Ready pod/sleep -n istio-test --timeout=120s
+
+          echo "Verifying sidecar injection..."
+          CONTAINERS=$(kubectl get pod sleep -n istio-test -o jsonpath='{.spec.containers[*].name}')
+          echo "Containers: $CONTAINERS"
+          if echo "$CONTAINERS" | grep -q "istio-proxy"; then
+            echo "SUCCESS: Sidecar injected!"
+          else
+            echo "FAILURE: Sidecar not found"
+            kubectl describe pod sleep -n istio-test
+            exit 1
+          fi
+
+      - name: Verify mTLS configuration
+        run: |
+          echo "Checking PeerAuthentication policy..."
+          kubectl get peerauthentication -n istio-system
+
+          MTLS_MODE=$(kubectl get peerauthentication default -n istio-system -o jsonpath='{.spec.mtls.mode}')
+          echo "mTLS mode: $MTLS_MODE"
+          if [ "$MTLS_MODE" = "STRICT" ]; then
+            echo "SUCCESS: mTLS STRICT mode enforced"
+          else
+            echo "FAILURE: Expected STRICT, got $MTLS_MODE"
+            exit 1
+          fi
+
+      - name: Test idempotency
+        run: |
+          echo "Running istio-up again to verify idempotency..."
+          make istio-up
+          echo "Idempotency test passed!"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          kubectl delete namespace istio-test --ignore-not-found=true || true
+          make istio-down || true
+          make cluster-down

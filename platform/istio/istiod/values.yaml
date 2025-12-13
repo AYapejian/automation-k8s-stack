@@ -1,0 +1,79 @@
+# istio/istiod chart - Control plane configuration for k3d
+# https://istio.io/latest/docs/setup/install/helm/
+#
+# Optimized for local development with reduced resource requirements.
+# Telemetry configured for Prometheus metrics and OTel tracing (Phase 3).
+
+revision: ""
+
+# Pilot (istiod) configuration
+pilot:
+  autoscaleEnabled: false
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Mesh configuration
+meshConfig:
+  # Access logging to stdout (collected by Loki in Phase 3.2)
+  accessLogFile: /dev/stdout
+  accessLogEncoding: JSON
+
+  # Enable Prometheus metrics merging
+  enablePrometheusMerge: true
+
+  # Default telemetry providers
+  defaultProviders:
+    metrics:
+      - prometheus
+
+  # Extension providers for tracing (activated in Phase 3.3)
+  extensionProviders:
+    - name: otel-tracing
+      opentelemetry:
+        port: 4317
+        service: otel-collector.observability.svc.cluster.local
+    - name: prometheus
+      prometheus: {}
+
+  # Proxy configuration
+  defaultConfig:
+    # 100% sampling for dev/testing (reduce in production)
+    tracing:
+      sampling: 100.0
+    # Hold application start until proxy is ready
+    holdApplicationUntilProxyStarts: true
+
+# Global configuration
+global:
+  # Proxy resource configuration (reduced for k3d)
+  proxy:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    # Graceful shutdown
+    lifecycle:
+      preStop:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - sleep 5
+
+  proxy_init:
+    resources:
+      limits:
+        cpu: 100m
+        memory: 50Mi
+      requests:
+        cpu: 10m
+        memory: 10Mi

@@ -1,0 +1,33 @@
+# Mesh-wide telemetry configuration
+# https://istio.io/latest/docs/tasks/observability/telemetry/
+#
+# Configures access logging and metrics collection.
+# Tracing is prepared but commented out until OTel Collector is deployed (Phase 3.3).
+apiVersion: telemetry.istio.io/v1
+kind: Telemetry
+metadata:
+  name: mesh-default
+  namespace: istio-system
+spec:
+  # Access logging configuration
+  accessLogging:
+    - providers:
+        - name: envoy
+
+  # Metrics configuration for Prometheus
+  metrics:
+    - providers:
+        - name: prometheus
+      overrides:
+        - match:
+            mode: CLIENT_AND_SERVER
+          tagOverrides:
+            request_protocol:
+              operation: UPSERT
+              value: request.protocol
+
+  # Tracing configuration (uncomment when OTel Collector is deployed in Phase 3.3)
+  # tracing:
+  #   - providers:
+  #       - name: otel-tracing
+  #     randomSamplingPercentage: 100.0

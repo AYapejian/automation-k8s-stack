@@ -1,0 +1,42 @@
+# istio/gateway chart - Ingress gateway configuration for k3d
+# https://istio.io/latest/docs/setup/additional-setup/gateway/
+#
+# Deploys Istio ingress gateway for external traffic.
+# Uses LoadBalancer service type with k3d port mappings (8080->80, 8443->443).
+
+# Service configuration
+service:
+  type: LoadBalancer
+  ports:
+    - name: status-port
+      port: 15021
+      protocol: TCP
+      targetPort: 15021
+    - name: http2
+      port: 80
+      protocol: TCP
+      targetPort: 80
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: 443
+
+# Deployment configuration
+replicaCount: 1
+
+autoscaling:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+# Pod annotations for Prometheus scraping
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "15020"
+  prometheus.io/path: /stats/prometheus
