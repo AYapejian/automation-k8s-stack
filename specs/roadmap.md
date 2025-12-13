@@ -6,6 +6,7 @@ Each phase represents a logical unit of work. Each numbered item should be imple
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
+| Local K8s | k3d | k3s in Docker - fast, cross-platform, reliable multi-node, matches prod |
 | Service Mesh | Istio | Work experience requirement |
 | Tracing | Jaeger + Tempo | Both for experience; OTel Collector fans out to both |
 | Time-series DB | Prometheus only | Drop InfluxDB; HA Prometheus integration covers metrics |
@@ -16,7 +17,7 @@ Each phase represents a logical unit of work. Each numbered item should be imple
 
 ## Phase 1: Foundation
 
-**Goal**: Reproducible CI environment with KIND cluster and test harness.
+**Goal**: Reproducible CI environment with k3d cluster and test harness.
 
 ### 1.1 Repository Structure + CI Skeleton
 **Branch**: `feature/repo-structure`
@@ -26,8 +27,8 @@ Each phase represents a logical unit of work. Each numbered item should be imple
   /
   ├── .github/workflows/       # GHA workflows
   ├── clusters/
-  │   ├── kind/                # KIND cluster configs
-  │   └── k3s/                 # Future: k3s overlays
+  │   ├── k3d/                 # k3d cluster configs (local dev & CI)
+  │   └── k3s/                 # k3s overlays (production)
   ├── platform/                # Service mesh, ingress, certs
   ├── observability/           # Prometheus, Grafana, Loki, tracing
   ├── apps/
@@ -41,16 +42,17 @@ Each phase represents a logical unit of work. Each numbered item should be imple
 - Makefile with common targets
 
 **Acceptance Criteria**:
-- [ ] `make help` shows available targets
-- [ ] GHA workflow triggers on PR, runs placeholder test
+- [x] `make help` shows available targets
+- [x] GHA workflow triggers on PR, runs placeholder test
 
-### 1.2 KIND Cluster Creation
-**Branch**: `feature/kind-cluster`
+### 1.2 k3d Cluster Creation
+**Branch**: `feature/1.2-k3d-cluster`
 
-- KIND config with:
-  - Multi-node setup (1 control-plane, 2 workers) for affinity testing
-  - Extra port mappings for ingress (80, 443)
-  - Local registry for image caching
+- k3d config with:
+  - Multi-node setup (1 server, 2 agents) for affinity testing
+  - Port mappings for ingress (8080 -> 80, 8443 -> 443)
+  - Built-in local registry (registry.localhost:5111)
+  - Node labels for simulated hardware affinity
 - Idempotent create/delete scripts
 
 **Acceptance Criteria**:
@@ -58,6 +60,7 @@ Each phase represents a logical unit of work. Each numbered item should be imple
 - [ ] `make cluster-down` destroys cluster (idempotent)
 - [ ] GHA can spin up cluster in CI
 - [ ] Running `make cluster-up` twice doesn't error
+- [ ] Node labels applied for affinity testing
 
 ### 1.3 Test Harness Framework
 **Branch**: `feature/test-harness`
@@ -114,18 +117,18 @@ Each phase represents a logical unit of work. Each numbered item should be imple
 
 - Istio Ingress Gateway (not separate NGINX - leverage mesh)
 - cert-manager for TLS
-- Self-signed ClusterIssuer for KIND
+- Self-signed ClusterIssuer for k3d
 - Gateway + VirtualService patterns established
 
 **Acceptance Criteria**:
-- [ ] Ingress Gateway accessible on localhost:80/443
+- [ ] Ingress Gateway accessible on localhost:8080/8443
 - [ ] cert-manager issues self-signed cert
 - [ ] Sample app reachable via ingress with TLS
 
 ### 2.3 Storage Provisioner
 **Branch**: `feature/storage`
 
-- Local path provisioner for KIND (dynamic PV creation)
+- Local path provisioner for k3d (dynamic PV creation)
 - StorageClass definitions:
   - `standard` - local-path (default)
   - `nas` - placeholder, overridden in k3s
@@ -204,7 +207,7 @@ Each phase represents a logical unit of work. Each numbered item should be imple
 ### 4.1 Minio
 **Branch**: `feature/minio`
 
-- Single-node Minio for KIND (HA for prod)
+- Single-node Minio for k3d (HA for prod)
 - Buckets: `velero`, `tempo-traces`, `loki-chunks`
 - Sealed Secret for credentials
 
@@ -236,13 +239,13 @@ Each phase represents a logical unit of work. Each numbered item should be imple
 Components:
 - HomeAssistant (with Prometheus integration)
 - Mosquitto MQTT broker
-- Zigbee2MQTT (mock in KIND, real hardware in k3s)
+- Zigbee2MQTT (mock in k3d, real hardware in k3s)
 - Homebridge
 
 **Validation needed**: Confirm HA Prometheus integration captures state changes and events adequately. If not, implement custom sensors or event-to-metric bridge.
 
 Node Affinity:
-- KIND: soft affinity to specific workers (simulated)
+- k3d: soft affinity to specific agents (simulated labels)
 - k3s: hard affinity to nodes with USB/Zigbee hardware
 
 **Acceptance Criteria**:
@@ -276,10 +279,10 @@ Hardware requirements (k3s only):
 - NVIDIA GPU for detection
 - NAS storage for recordings
 
-KIND: Deploy with CPU-only config, no actual camera streams.
+k3d: Deploy with CPU-only config, no actual camera streams.
 
 **Acceptance Criteria**:
-- [ ] Frigate pod runs in KIND (degraded mode)
+- [ ] Frigate pod runs in k3d (degraded mode)
 - [ ] Metrics exported
 - [ ] GPU scheduling works in k3s (future)
 
@@ -341,7 +344,7 @@ feature/<phase>-<component>
 ```
 
 Examples:
-- `feature/1.2-kind-cluster`
+- `feature/1.2-k3d-cluster`
 - `feature/2.1-istio`
 - `feature/5.1-home-automation`
 
@@ -349,7 +352,7 @@ Examples:
 
 1. Create feature branch from `main`
 2. Implement with tests
-3. PR triggers GHA → KIND cluster → tests
+3. PR triggers GHA → k3d cluster → tests
 4. Merge to `main` after review
 5. ArgoCD syncs `main` to clusters (Phase 6+)
 

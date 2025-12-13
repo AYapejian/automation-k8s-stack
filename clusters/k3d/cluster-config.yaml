@@ -1,0 +1,59 @@
+# k3d cluster configuration for local development and CI
+# Multi-node setup: 1 server + 2 agents (workers)
+#
+# Port mappings:
+#   - 8080 -> 80 (HTTP ingress via Traefik)
+#   - 8443 -> 443 (HTTPS ingress via Traefik)
+#   - 30000-30100 (NodePort range)
+#
+# Local registry: k3d-registry.localhost:5111
+#
+# Access services via localhost:8080 and localhost:8443
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: automation-k8s
+servers: 1
+agents: 2
+image: rancher/k3s:v1.31.2-k3s1
+kubeAPI:
+  hostIP: "127.0.0.1"
+ports:
+  # HTTP ingress (loadbalancer -> Traefik)
+  - port: 8080:80
+    nodeFilters:
+      - loadbalancer
+  # HTTPS ingress
+  - port: 8443:443
+    nodeFilters:
+      - loadbalancer
+  # NodePort range for direct service access
+  - port: 30000-30100:30000-30100
+    nodeFilters:
+      - servers:*
+      - agents:*
+registries:
+  create:
+    name: registry.localhost
+    host: "0.0.0.0"
+    hostPort: "5111"
+  config: |
+    mirrors:
+      "registry.localhost:5111":
+        endpoint:
+          - http://k3d-registry.localhost:5111
+options:
+  k3d:
+    wait: true
+    timeout: "120s"
+  k3s:
+    extraArgs:
+      - arg: --disable=traefik
+        nodeFilters:
+          - servers:*
+      - arg: --tls-san=127.0.0.1
+        nodeFilters:
+          - servers:*
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true
