@@ -1,0 +1,29 @@
+# Authorization policies for Istio mesh
+# https://istio.io/latest/docs/reference/config/security/authorization-policy/
+#
+# Note: We do NOT apply a mesh-wide deny-all policy because:
+# 1. It would break system namespaces (kube-system, istio-system)
+# 2. Each application namespace should define its own policies
+# 3. This file provides baseline policies for observability
+
+---
+# Allow Prometheus to scrape metrics from all meshed workloads
+# Applied when observability stack is deployed (Phase 3.1)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: istio-system
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - observability
+              - monitoring
+      to:
+        - operation:
+            ports:
+              - "15020"   # Istio merged metrics port
+              - "15090"   # Envoy admin stats

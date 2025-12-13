@@ -1,4 +1,4 @@
-.PHONY: help cluster-up cluster-down cluster-status test lint clean
+.PHONY: help cluster-up cluster-down cluster-status istio-up istio-down istio-status test lint clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -32,6 +32,27 @@ cluster-status: ## Show cluster status
 		echo "Registry:" && \
 		k3d registry list 2>/dev/null | grep "registry.localhost" || \
 		echo "Registry: not running"
+
+##@ Platform
+
+istio-up: ## Install Istio service mesh (idempotent)
+	@$(SCRIPTS_DIR)/istio-up.sh
+
+istio-down: ## Uninstall Istio service mesh (idempotent)
+	@$(SCRIPTS_DIR)/istio-down.sh --force
+
+istio-status: ## Show Istio status
+	@echo "Checking Istio status..."
+	@echo ""
+	@echo "Helm releases:"
+	@helm list -n istio-system 2>/dev/null || echo "  (none)"
+	@helm list -n istio-ingress 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Istio system pods:"
+	@kubectl get pods -n istio-system 2>/dev/null || echo "  istio-system namespace not found"
+	@echo ""
+	@echo "Istio ingress pods:"
+	@kubectl get pods -n istio-ingress 2>/dev/null || echo "  istio-ingress namespace not found"
 
 ##@ Testing
 

@@ -1,0 +1,7 @@
+# istio/base chart - CRDs and cluster-wide resources
+# https://istio.io/latest/docs/setup/install/helm/
+#
+# This chart installs Istio CRDs and is required before installing istiod.
+# Minimal configuration - primarily uses defaults.
+
+defaultRevision: default

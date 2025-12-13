@@ -1,0 +1,18 @@
+# istio/gateway chart - Ingress gateway configuration for k3d
+# https://istio.io/latest/docs/setup/additional-setup/gateway/
+#
+# Deploys Istio ingress gateway for external traffic.
+# Uses LoadBalancer service type with k3d port mappings (8080->80, 8443->443).
+#
+# Note: The gateway chart has strict schema validation. Most values are passed
+# via --set flags in istio-up.sh to avoid schema conflicts. Chart defaults are
+# reasonable for k3d (LoadBalancer, ports 80/443/15021, autoscaling 1-5).
+#
+# Default chart values provide:
+# - service.type: LoadBalancer
+# - ports: 80 (http2), 443 (https), 15021 (status)
+# - autoscaling: enabled (1-5 replicas)
+# - resources: 100m/128Mi requests, 2000m/1024Mi limits
+# - podAnnotations: Prometheus scraping enabled
+#
+# For k3d, we disable autoscaling and reduce resources via --set flags.
