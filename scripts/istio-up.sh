@@ -123,8 +123,10 @@ install_gateway() {
     # Label namespace for sidecar injection
     kubectl label namespace "${ISTIO_INGRESS_NAMESPACE}" istio-injection=enabled --overwrite
 
-    # Gateway chart has strict schema validation that rejects most customizations.
-    # Using chart defaults which are suitable for k3d:
+    # Gateway chart in Istio 1.24.0 has a broken JSON schema that rejects its own
+    # default values. Using --skip-schema-validation as a workaround.
+    # See: https://github.com/istio/istio/issues/
+    # Chart defaults are suitable for k3d:
     # - service.type: LoadBalancer (works with k3d port mappings)
     # - ports: 80, 443, 15021 (standard Istio gateway ports)
     # - autoscaling: enabled 1-5 replicas
@@ -135,11 +137,13 @@ install_gateway() {
         helm upgrade istio-ingress istio/gateway \
             -n "${ISTIO_INGRESS_NAMESPACE}" \
             --version "${ISTIO_VERSION}" \
+            --skip-schema-validation \
             --wait --timeout 5m
     else
         helm install istio-ingress istio/gateway \
             -n "${ISTIO_INGRESS_NAMESPACE}" \
             --version "${ISTIO_VERSION}" \
+            --skip-schema-validation \
             --wait --timeout 5m
     fi
 }
