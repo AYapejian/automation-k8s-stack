@@ -1,0 +1,42 @@
+# TLS Certificate for Istio Gateway
+# Uses automation-ca-issuer from cert-manager to create a certificate
+# for all *.localhost domains used by applications.
+#
+# The certificate is stored in gateway-tls-secret and referenced by
+# the Gateway resource for TLS termination.
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gateway-tls
+  namespace: istio-ingress
+spec:
+  secretName: gateway-tls-secret
+  duration: 2160h  # 90 days
+  renewBefore: 360h  # 15 days
+  subject:
+    organizations:
+      - automation-k8s-stack
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  usages:
+    - server auth
+    - digital signature
+    - key encipherment
+  dnsNames:
+    # Base domains
+    - "localhost"
+    - "*.localhost"
+    # Application-specific domains (for documentation/clarity)
+    # These are covered by *.localhost but listed for reference
+    - "httpbin.localhost"
+    - "grafana.localhost"
+    - "prometheus.localhost"
+    - "jaeger.localhost"
+    - "argocd.localhost"
+    - "homeassistant.localhost"
+  issuerRef:
+    name: automation-ca-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io

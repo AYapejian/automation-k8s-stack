@@ -1,0 +1,52 @@
+# Self-signed CA chain for k3d development
+# Production (k3s) will use Let's Encrypt or Vault
+#
+# Architecture:
+# 1. selfsigned-issuer (ClusterIssuer) - Bootstrap issuer for creating CA
+# 2. selfsigned-ca (Certificate) - Self-signed CA certificate
+# 3. automation-ca-issuer (ClusterIssuer) - Signs application certificates
+#
+# Applications request certificates from automation-ca-issuer, which signs
+# them using the CA certificate created by selfsigned-issuer.
+
+---
+# Bootstrap ClusterIssuer for creating the CA certificate
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+
+---
+# CA Certificate for signing other certificates
+# This certificate is self-signed using selfsigned-issuer
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: selfsigned-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: automation-k8s-ca
+  secretName: selfsigned-ca-secret
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  duration: 87600h  # 10 years
+  renewBefore: 8760h  # 1 year
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+
+---
+# CA Issuer for signing application certificates
+# This issuer uses the CA certificate to sign new certificates
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: automation-ca-issuer
+spec:
+  ca:
+    secretName: selfsigned-ca-secret

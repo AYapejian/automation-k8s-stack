@@ -1,0 +1,21 @@
+# VirtualService routes traffic from Gateway to httpbin
+# Accessible at https://httpbin.localhost:8443
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: httpbin
+  namespace: ingress-sample
+spec:
+  hosts:
+    - "httpbin.localhost"
+  gateways:
+    - istio-ingress/main-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: httpbin.ingress-sample.svc.cluster.local
+            port:
+              number: 8080

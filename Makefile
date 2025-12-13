@@ -1,4 +1,4 @@
-.PHONY: help cluster-up cluster-down cluster-status istio-up istio-down istio-status test lint clean
+.PHONY: help cluster-up cluster-down cluster-status istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status test lint clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -53,6 +53,65 @@ istio-status: ## Show Istio status
 	@echo ""
 	@echo "Istio ingress pods:"
 	@kubectl get pods -n istio-ingress 2>/dev/null || echo "  istio-ingress namespace not found"
+
+cert-manager-up: ## Install cert-manager for TLS certificates (idempotent)
+	@$(SCRIPTS_DIR)/cert-manager-up.sh
+
+cert-manager-down: ## Uninstall cert-manager (idempotent)
+	@$(SCRIPTS_DIR)/cert-manager-down.sh --force
+
+cert-manager-status: ## Show cert-manager status
+	@echo "Checking cert-manager status..."
+	@echo ""
+	@echo "Helm release:"
+	@helm list -n cert-manager 2>/dev/null || echo "  (not installed)"
+	@echo ""
+	@echo "cert-manager pods:"
+	@kubectl get pods -n cert-manager 2>/dev/null || echo "  cert-manager namespace not found"
+	@echo ""
+	@echo "ClusterIssuers:"
+	@kubectl get clusterissuers 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Certificates:"
+	@kubectl get certificates -A 2>/dev/null || echo "  (none)"
+
+ingress-up: ## Configure Gateway and TLS certificates (requires cert-manager)
+	@$(SCRIPTS_DIR)/ingress-up.sh
+
+ingress-down: ## Remove Gateway and TLS certificates (idempotent)
+	@$(SCRIPTS_DIR)/ingress-down.sh --force
+
+ingress-status: ## Show Gateway and certificate status
+	@echo "Checking ingress configuration..."
+	@echo ""
+	@echo "Gateway:"
+	@kubectl get gateway -n istio-ingress 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "VirtualServices:"
+	@kubectl get virtualservices -A 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Gateway Certificate:"
+	@kubectl get certificate -n istio-ingress 2>/dev/null || echo "  (none)"
+
+##@ Sample Applications
+
+sample-app-up: ## Deploy sample httpbin app (requires ingress)
+	@$(SCRIPTS_DIR)/sample-app-up.sh
+
+sample-app-down: ## Remove sample httpbin app (idempotent)
+	@$(SCRIPTS_DIR)/sample-app-down.sh --force
+
+sample-app-status: ## Show sample app status
+	@echo "Checking sample app..."
+	@echo ""
+	@echo "Pods:"
+	@kubectl get pods -n ingress-sample 2>/dev/null || echo "  ingress-sample namespace not found"
+	@echo ""
+	@echo "Services:"
+	@kubectl get services -n ingress-sample 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "VirtualServices:"
+	@kubectl get virtualservices -n ingress-sample 2>/dev/null || echo "  (none)"
 
 ##@ Testing
 

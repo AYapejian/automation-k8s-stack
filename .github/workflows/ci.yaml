@@ -177,3 +177,137 @@ jobs:
           kubectl delete namespace istio-test --ignore-not-found=true || true
           make istio-down || true
           make cluster-down
+
+  ingress-test:
+    name: Ingress + TLS Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install prerequisites
+        run: |
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          k3d version
+          helm version
+          jq --version
+
+      - name: Create k3d cluster
+        run: make cluster-up
+
+      - name: Install Istio
+        run: make istio-up
+
+      - name: Install cert-manager
+        run: make cert-manager-up
+
+      - name: Verify cert-manager is ready
+        run: |
+          echo "Checking cert-manager pods..."
+          kubectl wait --for=condition=Ready pods --all -n cert-manager --timeout=120s
+          echo ""
+          echo "Checking ClusterIssuers..."
+          kubectl wait --for=condition=Ready clusterissuer/selfsigned-issuer --timeout=60s
+          kubectl wait --for=condition=Ready clusterissuer/automation-ca-issuer --timeout=60s
+          echo ""
+          echo "ClusterIssuers ready:"
+          kubectl get clusterissuers
+
+      - name: Configure ingress Gateway
+        run: make ingress-up
+
+      - name: Verify Gateway certificate is issued
+        run: |
+          echo "Checking gateway certificate..."
+          kubectl wait --for=condition=Ready certificate/gateway-tls -n istio-ingress --timeout=120s
+          echo ""
+          echo "Certificate status:"
+          kubectl get certificate -n istio-ingress
+          echo ""
+          echo "TLS secret created:"
+          kubectl get secret gateway-tls-secret -n istio-ingress
+
+      - name: Deploy sample application
+        run: make sample-app-up
+
+      - name: Verify sample app has sidecar
+        run: |
+          echo "Checking httpbin pod..."
+          kubectl wait --for=condition=Ready pods -l app=httpbin -n ingress-sample --timeout=120s
+          echo ""
+          echo "Verifying sidecar injection..."
+          CONTAINERS=$(kubectl get pod -l app=httpbin -n ingress-sample -o jsonpath='{.items[0].spec.containers[*].name}')
+          echo "Containers: $CONTAINERS"
+          if echo "$CONTAINERS" | grep -q "istio-proxy"; then
+            echo "SUCCESS: Sidecar injected!"
+          else
+            echo "FAILURE: Sidecar not found"
+            kubectl describe pod -l app=httpbin -n ingress-sample
+            exit 1
+          fi
+
+      - name: Test HTTP to HTTPS redirect
+        run: |
+          echo "Testing HTTP redirect (port 8080)..."
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: httpbin.localhost" http://localhost:8080/get || true)
+          echo "HTTP response code: $RESPONSE"
+          # 301 or 308 redirect expected
+          if [ "$RESPONSE" = "301" ] || [ "$RESPONSE" = "308" ]; then
+            echo "SUCCESS: HTTP redirects to HTTPS"
+          else
+            echo "FAILURE: Expected redirect (301/308), got $RESPONSE"
+            echo "Gateway logs:"
+            kubectl logs -n istio-ingress deployment/istio-ingress --tail=20 || true
+            exit 1
+          fi
+
+      - name: Test HTTPS ingress
+        run: |
+          echo "Testing HTTPS ingress (port 8443)..."
+          # Use -k to accept self-signed cert
+          RESPONSE=$(curl -sk -H "Host: httpbin.localhost" https://localhost:8443/get)
+          echo "Response: $RESPONSE"
+          if echo "$RESPONSE" | jq -e '.url' >/dev/null 2>&1; then
+            echo "SUCCESS: HTTPS ingress working!"
+          else
+            echo "FAILURE: Invalid response"
+            echo "Gateway logs:"
+            kubectl logs -n istio-ingress deployment/istio-ingress --tail=20 || true
+            exit 1
+          fi
+
+      - name: Test httpbin endpoints
+        run: |
+          echo "Testing /headers endpoint..."
+          curl -sk -H "Host: httpbin.localhost" https://localhost:8443/headers | jq .
+          echo ""
+          echo "Testing /status/200 endpoint..."
+          STATUS=$(curl -sk -o /dev/null -w "%{http_code}" -H "Host: httpbin.localhost" https://localhost:8443/status/200)
+          if [ "$STATUS" = "200" ]; then
+            echo "SUCCESS: Status endpoint returns 200"
+          else
+            echo "FAILURE: Expected 200, got $STATUS"
+            exit 1
+          fi
+
+      - name: Test idempotency
+        run: |
+          echo "Running cert-manager-up again..."
+          make cert-manager-up
+          echo "Running ingress-up again..."
+          make ingress-up
+          echo "Running sample-app-up again..."
+          make sample-app-up
+          echo "Idempotency tests passed!"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          make sample-app-down || true
+          make ingress-down || true
+          make cert-manager-down || true
+          make istio-down || true
+          make cluster-down
