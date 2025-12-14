@@ -136,6 +136,28 @@ apply_virtualservices() {
     kubectl apply -f "${OBS_DIR}/resources/virtualservice-prometheus.yaml"
 }
 
+# Apply Grafana dashboards
+apply_dashboards() {
+    local dashboards_dir="${OBS_DIR}/resources/dashboards"
+    if [[ -d "${dashboards_dir}" ]]; then
+        log_info "Applying Grafana dashboards..."
+        kubectl apply -f "${dashboards_dir}/"
+    else
+        log_warn "Dashboards directory not found: ${dashboards_dir}"
+    fi
+}
+
+# Apply PrometheusRules for alerting
+apply_prometheus_rules() {
+    local rules_file="${OBS_DIR}/resources/prometheus-rules.yaml"
+    if [[ -f "${rules_file}" ]]; then
+        log_info "Applying PrometheusRules..."
+        kubectl apply -f "${rules_file}"
+    else
+        log_warn "PrometheusRules file not found: ${rules_file}"
+    fi
+}
+
 # Verify installation
 verify_installation() {
     log_info "Verifying installation..."
@@ -203,6 +225,8 @@ main() {
     install_prometheus_stack
     apply_istio_monitors
     apply_virtualservices
+    apply_dashboards
+    apply_prometheus_rules
     verify_installation
     print_info
 
