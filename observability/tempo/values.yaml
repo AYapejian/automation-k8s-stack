@@ -1,0 +1,74 @@
+# Tempo Helm values for k3d
+# Chart: grafana/tempo
+# Docs: https://grafana.com/docs/tempo/latest/
+
+# Single binary mode for k3d
+replicas: 1
+
+tempo:
+  repository: grafana/tempo
+  pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Disable multitenancy for simplicity
+  multitenancyEnabled: false
+
+  # Trace retention
+  retention: 24h
+
+  # Memory ballast size
+  memBallastSizeMbs: 256
+
+  # Server configuration
+  server:
+    http_listen_port: 3200
+
+  # Storage configuration - use Minio S3
+  storage:
+    trace:
+      backend: s3
+      s3:
+        bucket: tempo-traces
+        endpoint: minio.minio.svc.cluster.local:9000
+        access_key: minioadmin
+        secret_key: minioadmin123
+        insecure: true
+      wal:
+        path: /var/tempo/wal
+      local:
+        path: /var/tempo/blocks
+
+  # Receivers - OTLP only (OTel Collector sends here)
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+        http:
+          endpoint: "0.0.0.0:4318"
+    # Disable other receivers
+    jaeger: null
+    opencensus: null
+    zipkin: null
+
+# Persistence for WAL
+persistence:
+  enabled: true
+  size: 5Gi
+
+# Service configuration
+service:
+  type: ClusterIP
+
+# ServiceMonitor for Prometheus
+serviceMonitor:
+  enabled: true
+  labels:
+    release: prometheus
