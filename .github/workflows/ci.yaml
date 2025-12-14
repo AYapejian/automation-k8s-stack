@@ -348,7 +348,7 @@ jobs:
         run: |
           echo "Checking Minio pods..."
           kubectl get pods -n minio
-          kubectl wait --for=condition=Ready pods -l release=minio -n minio --timeout=180s
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=minio -n minio --timeout=180s
           echo ""
           echo "Checking services..."
           kubectl get svc -n minio
@@ -364,7 +364,7 @@ jobs:
           kubectl get jobs -n minio || true
           echo ""
           echo "Checking Minio logs for bucket info..."
-          kubectl logs -n minio -l release=minio --tail=50 || true
+          kubectl logs -n minio -l app.kubernetes.io/name=minio --tail=50 || true
 
       - name: Test Minio health endpoint
         run: |
