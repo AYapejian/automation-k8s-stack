@@ -99,10 +99,15 @@ install_minio() {
     fi
 }
 
-# Apply VirtualService for console access
+# Apply VirtualService for console access (only if Istio is installed)
 apply_virtualservice() {
-    log_info "Applying VirtualService for Minio console..."
-    kubectl apply -f "${MINIO_DIR}/resources/virtualservice.yaml"
+    # Check if Istio CRDs are installed
+    if kubectl get crd virtualservices.networking.istio.io >/dev/null 2>&1; then
+        log_info "Applying VirtualService for Minio console..."
+        kubectl apply -f "${MINIO_DIR}/resources/virtualservice.yaml"
+    else
+        log_warn "Istio not installed, skipping VirtualService (Minio console only accessible via port-forward)"
+    fi
 }
 
 # Verify installation
