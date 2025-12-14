@@ -348,7 +348,7 @@ jobs:
         run: |
           echo "Checking Minio pods..."
           kubectl get pods -n minio
-          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=minio -n minio --timeout=180s
+          kubectl wait --for=condition=Ready pods -l release=minio -n minio --timeout=180s
           echo ""
           echo "Checking services..."
           kubectl get svc -n minio
@@ -364,7 +364,7 @@ jobs:
           kubectl get jobs -n minio || true
           echo ""
           echo "Checking Minio logs for bucket info..."
-          kubectl logs -n minio -l app.kubernetes.io/name=minio --tail=50 || true
+          kubectl logs -n minio -l release=minio --tail=50 || true
 
       - name: Test Minio health endpoint
         run: |
@@ -410,7 +410,7 @@ jobs:
     name: Loki Log Aggregation Tests
     runs-on: ubuntu-latest
     needs: lint
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -429,13 +429,19 @@ jobs:
       - name: Install Istio
         run: make istio-up
 
+      - name: Install cert-manager
+        run: make cert-manager-up
+
+      - name: Configure ingress
+        run: make ingress-up
+
       - name: Install Minio (required for Loki storage)
         run: make minio-up
 
       - name: Wait for Minio to be ready
         run: |
           echo "Waiting for Minio..."
-          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=minio -n minio --timeout=180s
+          kubectl wait --for=condition=Ready pods -l release=minio -n minio --timeout=180s
           # Wait for bucket creation job
           sleep 30
 
@@ -490,5 +496,7 @@ jobs:
           make loki-down || true
           make prometheus-grafana-down || true
           make minio-down || true
+          make ingress-down || true
+          make cert-manager-down || true
           make istio-down || true
           make cluster-down

@@ -99,23 +99,28 @@ install_minio() {
     fi
 }
 
-# Apply VirtualService for console access
+# Apply VirtualService for console access (only if Istio is installed)
 apply_virtualservice() {
-    log_info "Applying VirtualService for Minio console..."
-    kubectl apply -f "${MINIO_DIR}/resources/virtualservice.yaml"
+    # Check if Istio CRDs are installed
+    if kubectl get crd virtualservices.networking.istio.io >/dev/null 2>&1; then
+        log_info "Applying VirtualService for Minio console..."
+        kubectl apply -f "${MINIO_DIR}/resources/virtualservice.yaml"
+    else
+        log_warn "Istio not installed, skipping VirtualService (Minio console only accessible via port-forward)"
+    fi
 }
 
 # Verify installation
 verify_installation() {
     log_info "Verifying installation..."
 
-    # Wait for Minio pod
+    # Wait for Minio pod (uses release=minio label from Helm chart)
     log_info "Waiting for Minio pod..."
-    if ! kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=minio \
+    if ! kubectl wait --for=condition=Ready pod -l release=minio \
         -n "${NAMESPACE}" --timeout=180s; then
         log_error "Minio pod not ready"
         kubectl get pods -n "${NAMESPACE}"
-        kubectl describe pod -l app.kubernetes.io/name=minio -n "${NAMESPACE}"
+        kubectl describe pod -l release=minio -n "${NAMESPACE}"
         exit 1
     fi
 
