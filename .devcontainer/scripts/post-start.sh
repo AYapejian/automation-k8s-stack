@@ -31,6 +31,12 @@ fi
 # TEMPLATE: Change cluster name for different projects
 CLUSTER_NAME="automation-k8s"
 
+# Fix volume ownership if needed (Docker volumes mount as root)
+if [ -d ~/.kube ] && [ "$(stat -c '%U' ~/.kube 2>/dev/null)" = "root" ]; then
+    echo "[INFO] Fixing ~/.kube ownership..."
+    sudo chown -R vscode:vscode ~/.kube
+fi
+
 if k3d cluster list 2>/dev/null | grep -q "${CLUSTER_NAME}"; then
     echo "[INFO] Found existing k3d cluster '${CLUSTER_NAME}', updating kubeconfig..."
 
