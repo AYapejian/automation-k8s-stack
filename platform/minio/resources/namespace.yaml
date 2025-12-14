@@ -1,0 +1,9 @@
+# Minio namespace
+# Note: Not injected with Istio sidecar since Minio handles its own security
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minio
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/component: storage

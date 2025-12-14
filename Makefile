@@ -1,4 +1,4 @@
-.PHONY: help cluster-up cluster-down cluster-status kubeconfig istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status stack-up stack-down stack-status test lint clean
+.PHONY: help cluster-up cluster-down cluster-status kubeconfig istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status minio-up minio-down minio-status stack-up stack-down stack-status test lint clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -135,6 +135,29 @@ storage-status: ## Show StorageClasses and PVCs
 	@echo ""
 	@echo "PersistentVolumes:"
 	@kubectl get pv 2>/dev/null || echo "  (none)"
+
+minio-up: ## Install Minio object storage (idempotent)
+	@$(SCRIPTS_DIR)/minio-up.sh
+
+minio-down: ## Uninstall Minio object storage (idempotent)
+	@$(SCRIPTS_DIR)/minio-down.sh --force
+
+minio-status: ## Show Minio status
+	@echo "Checking Minio status..."
+	@echo ""
+	@echo "Helm release:"
+	@helm list -n minio 2>/dev/null || echo "  (not installed)"
+	@echo ""
+	@echo "Pods:"
+	@kubectl get pods -n minio 2>/dev/null || echo "  minio namespace not found"
+	@echo ""
+	@echo "Services:"
+	@kubectl get svc -n minio 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "PVCs:"
+	@kubectl get pvc -n minio 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Console URL: https://minio.localhost:8443"
 
 ##@ Observability
 

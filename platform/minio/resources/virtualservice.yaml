@@ -1,0 +1,21 @@
+# VirtualService routes traffic from Gateway to Minio Console
+# Accessible at https://minio.localhost:8443
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: minio-console
+  namespace: minio
+spec:
+  hosts:
+    - "minio.localhost"
+  gateways:
+    - istio-ingress/main-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: minio-console.minio.svc.cluster.local
+            port:
+              number: 9001

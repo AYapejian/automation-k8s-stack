@@ -1,0 +1,91 @@
+# Minio Helm values for k3d development environment
+# Chart: minio/minio
+# Docs: https://min.io/docs/minio/kubernetes/upstream/
+
+# Standalone mode for k3d (single node, single drive)
+mode: standalone
+
+# Use existing secret for credentials
+existingSecret: minio-credentials
+
+# Replicas for standalone mode
+replicas: 1
+
+# Resource limits appropriate for k3d
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Persistence
+persistence:
+  enabled: true
+  storageClass: ""  # Use default (local-path in k3d)
+  accessMode: ReadWriteOnce
+  size: 10Gi
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: "9000"
+
+consoleService:
+  type: ClusterIP
+  port: "9001"
+
+# Disable ingress (we use Istio VirtualService)
+ingress:
+  enabled: false
+
+consoleIngress:
+  enabled: false
+
+# Buckets to create automatically
+buckets:
+  - name: loki-chunks
+    policy: none
+    purge: false
+    versioning: false
+    objectlocking: false
+  - name: tempo-traces
+    policy: none
+    purge: false
+    versioning: false
+    objectlocking: false
+  - name: velero
+    policy: none
+    purge: false
+    versioning: false
+    objectlocking: false
+
+# Job configuration for bucket creation
+makeBucketJob:
+  securityContext:
+    enabled: false
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 50m
+
+# Disable metrics for now (can enable for production)
+metrics:
+  serviceMonitor:
+    enabled: false
+
+# Security context
+securityContext:
+  enabled: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+# Pod disruption budget (not needed for standalone)
+podDisruptionBudget:
+  enabled: false
+
+# Disable network policy for simplicity
+networkPolicy:
+  enabled: false
