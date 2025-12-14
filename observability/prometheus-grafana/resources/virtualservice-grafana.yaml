@@ -1,0 +1,21 @@
+# VirtualService routes traffic from Gateway to Grafana
+# Accessible at https://grafana.localhost:8443
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: grafana
+  namespace: observability
+spec:
+  hosts:
+    - "grafana.localhost"
+  gateways:
+    - istio-ingress/main-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: prometheus-grafana.observability.svc.cluster.local
+            port:
+              number: 80

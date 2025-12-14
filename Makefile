@@ -1,4 +1,4 @@
-.PHONY: help cluster-up cluster-down cluster-status istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status test lint clean
+.PHONY: help cluster-up cluster-down cluster-status istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status test lint clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -132,6 +132,33 @@ storage-status: ## Show StorageClasses and PVCs
 	@echo ""
 	@echo "PersistentVolumes:"
 	@kubectl get pv 2>/dev/null || echo "  (none)"
+
+##@ Observability
+
+prometheus-grafana-up: ## Install Prometheus + Grafana stack (idempotent)
+	@$(SCRIPTS_DIR)/prometheus-grafana-up.sh
+
+prometheus-grafana-down: ## Uninstall Prometheus + Grafana stack (idempotent)
+	@$(SCRIPTS_DIR)/prometheus-grafana-down.sh --force
+
+prometheus-grafana-status: ## Show Prometheus + Grafana status
+	@echo "Checking Prometheus + Grafana status..."
+	@echo ""
+	@echo "Helm release:"
+	@helm list -n observability 2>/dev/null || echo "  (not installed)"
+	@echo ""
+	@echo "Pods:"
+	@kubectl get pods -n observability 2>/dev/null || echo "  observability namespace not found"
+	@echo ""
+	@echo "ServiceMonitors:"
+	@kubectl get servicemonitors -n observability 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "PodMonitors:"
+	@kubectl get podmonitors -n observability 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Access URLs:"
+	@echo "  Grafana:    https://grafana.localhost:8443"
+	@echo "  Prometheus: https://prometheus.localhost:8443"
 
 ##@ Testing
 

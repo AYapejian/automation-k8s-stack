@@ -1,0 +1,27 @@
+# ServiceMonitor for Istio control plane (istiod)
+# Scrapes metrics from the istiod deployment on port 15014
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: istio-component-monitor
+  namespace: observability
+  labels:
+    monitoring: istio-components
+    app.kubernetes.io/part-of: kube-prometheus-stack
+spec:
+  jobLabel: istio
+  targetLabels:
+    - app
+  selector:
+    matchExpressions:
+      - key: istio
+        operator: In
+        values:
+          - pilot
+  namespaceSelector:
+    matchNames:
+      - istio-system
+  endpoints:
+    - port: http-monitoring
+      interval: 15s
+      path: /metrics
