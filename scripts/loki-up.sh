@@ -56,7 +56,7 @@ check_prerequisites() {
     fi
 
     # Check if Minio is running (required for S3 storage)
-    if ! kubectl get pods -n minio -l app.kubernetes.io/name=minio -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; then
+    if ! kubectl get pods -n minio -l release=minio -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; then
         log_error "Minio is not running. Run 'make minio-up' first."
         log_error "Loki requires Minio for S3-compatible log storage."
         exit 1
@@ -91,13 +91,13 @@ install_loki_stack() {
             -n "${NAMESPACE}" \
             --version "${LOKI_STACK_VERSION}" \
             -f "${LOKI_DIR}/values.yaml" \
-            --wait --timeout 5m
+            --wait --timeout 10m
     else
         helm install loki grafana/loki-stack \
             -n "${NAMESPACE}" \
             --version "${LOKI_STACK_VERSION}" \
             -f "${LOKI_DIR}/values.yaml" \
-            --wait --timeout 5m
+            --wait --timeout 10m
     fi
 }
 

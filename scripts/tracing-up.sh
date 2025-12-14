@@ -59,7 +59,7 @@ check_prerequisites() {
     fi
 
     # Check if Minio is running (required for Tempo storage)
-    if ! kubectl get pods -n minio -l app.kubernetes.io/name=minio -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; then
+    if ! kubectl get pods -n minio -l release=minio -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; then
         log_error "Minio is not running. Run 'make minio-up' first."
         log_error "Tempo requires Minio for S3-compatible trace storage."
         exit 1
@@ -111,13 +111,13 @@ install_tempo() {
             -n "${NAMESPACE}" \
             --version "${TEMPO_VERSION}" \
             -f "${REPO_ROOT}/observability/tempo/values.yaml" \
-            --wait --timeout 5m
+            --wait --timeout 10m
     else
         helm install tempo grafana/tempo \
             -n "${NAMESPACE}" \
             --version "${TEMPO_VERSION}" \
             -f "${REPO_ROOT}/observability/tempo/values.yaml" \
-            --wait --timeout 5m
+            --wait --timeout 10m
     fi
 
     # Apply Grafana datasource
@@ -134,13 +134,13 @@ install_jaeger() {
             -n "${NAMESPACE}" \
             --version "${JAEGER_VERSION}" \
             -f "${REPO_ROOT}/observability/jaeger/values.yaml" \
-            --wait --timeout 5m
+            --wait --timeout 10m
     else
         helm install jaeger jaegertracing/jaeger \
             -n "${NAMESPACE}" \
             --version "${JAEGER_VERSION}" \
             -f "${REPO_ROOT}/observability/jaeger/values.yaml" \
-            --wait --timeout 5m
+            --wait --timeout 10m
     fi
 
     # Apply VirtualService for UI access
@@ -157,13 +157,13 @@ install_otel_collector() {
             -n "${NAMESPACE}" \
             --version "${OTEL_COLLECTOR_VERSION}" \
             -f "${REPO_ROOT}/observability/otel-collector/values.yaml" \
-            --wait --timeout 5m
+            --wait --timeout 10m
     else
         helm install otel-collector open-telemetry/opentelemetry-collector \
             -n "${NAMESPACE}" \
             --version "${OTEL_COLLECTOR_VERSION}" \
             -f "${REPO_ROOT}/observability/otel-collector/values.yaml" \
-            --wait --timeout 5m
+            --wait --timeout 10m
     fi
 }
 

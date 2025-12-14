@@ -74,7 +74,12 @@ observability/prometheus-grafana/
     ├── servicemonitor-istio.yaml          # ServiceMonitor for Istiod
     ├── podmonitor-envoy.yaml              # PodMonitor for Envoy sidecars
     ├── virtualservice-grafana.yaml        # Ingress for Grafana
-    └── virtualservice-prometheus.yaml     # Ingress for Prometheus
+    ├── virtualservice-prometheus.yaml     # Ingress for Prometheus
+    ├── prometheus-rules.yaml              # PrometheusRules for alerting
+    └── dashboards/
+        ├── cluster-overview.yaml          # Cluster health dashboard
+        ├── istio-mesh.yaml                # Istio RED metrics dashboard
+        └── namespace-resources.yaml       # Per-namespace resource dashboard
 ```
 
 ## Configuration
@@ -88,7 +93,7 @@ The configuration is optimized for local k3d development:
 | Prometheus retention | 24h | Short retention for local dev |
 | Prometheus storage | Ephemeral | No persistent volume needed |
 | Grafana anonymous access | Enabled (Viewer) | Easy local access |
-| Alertmanager | Disabled | Enabled in Phase 3.4 |
+| Alertmanager | Enabled | For alert evaluation |
 | etcd monitoring | Disabled | k3d/k3s uses SQLite |
 | Resource requests | Minimal | Suitable for local dev |
 
@@ -120,6 +125,90 @@ The stack includes:
 | `istio_request_duration_milliseconds` | Request latency |
 | `istio_tcp_connections_opened_total` | TCP connections opened |
 | `istio_tcp_connections_closed_total` | TCP connections closed |
+
+## Dashboards
+
+The stack includes pre-configured Grafana dashboards deployed as ConfigMaps:
+
+| Dashboard | Description |
+|-----------|-------------|
+| Cluster Overview | Node status, CPU/memory usage, pod counts |
+| Istio Mesh | RED metrics (Rate, Errors, Duration) for service mesh traffic |
+| Namespace Resources | Per-namespace CPU, memory, and pod status |
+
+Dashboards are automatically discovered by Grafana's sidecar via the `grafana_dashboard: "1"` label.
+
+### Adding Custom Dashboards
+
+Create a ConfigMap with the dashboard JSON:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-my-app
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+data:
+  my-app.json: |
+    {
+      "title": "My App Dashboard",
+      ...
+    }
+```
+
+## Alerting
+
+PrometheusRules define alerting conditions that Prometheus evaluates continuously.
+
+### Included Alert Rules
+
+| Alert | Severity | Description |
+|-------|----------|-------------|
+| PodCrashLooping | warning | Pod has restarted >3 times in 15 minutes |
+| PodNotReady | warning | Pod has been pending/unknown for >15 minutes |
+| ContainerOOMKilled | warning | Container was terminated due to OOM |
+| NodeNotReady | critical | Node has been not ready for >5 minutes |
+| NodeHighCPU | warning | Node CPU usage >90% for >15 minutes |
+| NodeHighMemory | warning | Node memory usage >90% for >15 minutes |
+| PVCNearlyFull | warning | PVC is >85% full |
+| PVCFull | critical | PVC is >95% full |
+| HighErrorRate | warning | Service has >5% error rate |
+| HighLatency | warning | Service P99 latency >1000ms |
+| DeploymentReplicasMismatch | warning | Deployment has unavailable replicas |
+| CertificateExpiringSoon | warning | Certificate expires in <7 days |
+
+### Viewing Alerts
+
+1. Open Prometheus: https://prometheus.localhost:8443
+2. Go to **Alerts** tab to see active and pending alerts
+3. Or use Grafana's built-in alerting view
+
+### Adding Custom Alerts
+
+Create a PrometheusRule resource:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: my-app-alerts
+  namespace: observability
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: my-app
+      rules:
+        - alert: MyAppDown
+          expr: up{job="my-app"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "My App is down"
+```
 
 ## Adding Custom ServiceMonitors
 

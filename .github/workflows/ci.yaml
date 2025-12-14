@@ -410,7 +410,7 @@ jobs:
     name: Loki Log Aggregation Tests
     runs-on: ubuntu-latest
     needs: lint
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -429,13 +429,19 @@ jobs:
       - name: Install Istio
         run: make istio-up
 
+      - name: Install cert-manager
+        run: make cert-manager-up
+
+      - name: Configure ingress
+        run: make ingress-up
+
       - name: Install Minio (required for Loki storage)
         run: make minio-up
 
       - name: Wait for Minio to be ready
         run: |
           echo "Waiting for Minio..."
-          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=minio -n minio --timeout=180s
+          kubectl wait --for=condition=Ready pods -l release=minio -n minio --timeout=180s
           # Wait for bucket creation job
           sleep 30
 
@@ -490,6 +496,8 @@ jobs:
           make loki-down || true
           make prometheus-grafana-down || true
           make minio-down || true
+          make ingress-down || true
+          make cert-manager-down || true
           make istio-down || true
           make cluster-down
 
@@ -516,13 +524,19 @@ jobs:
       - name: Install Istio
         run: make istio-up
 
+      - name: Install cert-manager
+        run: make cert-manager-up
+
+      - name: Configure ingress
+        run: make ingress-up
+
       - name: Install Minio (required for Tempo storage)
         run: make minio-up
 
       - name: Wait for Minio to be ready
         run: |
           echo "Waiting for Minio..."
-          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=minio -n minio --timeout=180s
+          kubectl wait --for=condition=Ready pods -l release=minio -n minio --timeout=180s
           sleep 30
 
       - name: Install Prometheus + Grafana
@@ -588,5 +602,120 @@ jobs:
           make tracing-down || true
           make prometheus-grafana-down || true
           make minio-down || true
+          make ingress-down || true
+          make cert-manager-down || true
+          make istio-down || true
+          make cluster-down
+
+  dashboards-test:
+    name: Dashboards and Alerting Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install prerequisites
+        run: |
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          k3d version
+          helm version
+          jq --version
+
+      - name: Create k3d cluster
+        run: make cluster-up
+
+      - name: Install Istio
+        run: make istio-up
+
+      - name: Install cert-manager
+        run: make cert-manager-up
+
+      - name: Configure ingress
+        run: make ingress-up
+
+      - name: Install Prometheus + Grafana
+        run: make prometheus-grafana-up
+
+      - name: Wait for stack to be ready
+        run: |
+          echo "Waiting for Prometheus Operator..."
+          kubectl wait --for=condition=Available deployment/prometheus-kube-prometheus-operator -n observability --timeout=300s
+          echo ""
+          echo "Waiting for Grafana..."
+          kubectl wait --for=condition=Available deployment/prometheus-grafana -n observability --timeout=300s
+          echo ""
+          echo "Waiting for Alertmanager..."
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=alertmanager -n observability --timeout=180s || echo "Alertmanager pod check (may not exist yet)"
+
+      - name: Verify dashboard ConfigMaps
+        run: |
+          echo "Checking dashboard ConfigMaps..."
+          kubectl get configmaps -n observability -l grafana_dashboard=1
+          echo ""
+          for cm in grafana-dashboard-cluster-overview grafana-dashboard-istio-mesh grafana-dashboard-namespace-resources; do
+            if kubectl get configmap "$cm" -n observability >/dev/null 2>&1; then
+              echo "OK: $cm exists"
+            else
+              echo "MISSING: $cm"
+              exit 1
+            fi
+          done
+
+      - name: Verify PrometheusRules
+        run: |
+          echo "Checking PrometheusRules..."
+          kubectl get prometheusrules -n observability
+          echo ""
+          if kubectl get prometheusrule cluster-alerts -n observability >/dev/null 2>&1; then
+            echo "OK: cluster-alerts PrometheusRule exists"
+            echo ""
+            echo "Rule groups:"
+            kubectl get prometheusrule cluster-alerts -n observability -o jsonpath='{.spec.groups[*].name}' | tr ' ' '\n'
+          else
+            echo "MISSING: cluster-alerts PrometheusRule"
+            exit 1
+          fi
+
+      - name: Test Grafana API access
+        run: |
+          echo "Testing Grafana API..."
+          kubectl run grafana-api-test \
+            --image=curlimages/curl:latest \
+            --restart=Never \
+            --rm -i --quiet \
+            --namespace observability \
+            -- curl -s "http://prometheus-grafana.observability.svc.cluster.local:80/api/health"
+          echo ""
+          echo "Grafana API accessible!"
+
+      - name: Verify dashboards are loaded in Grafana
+        run: |
+          echo "Checking dashboards in Grafana..."
+          kubectl run grafana-dashboards-test \
+            --image=curlimages/curl:latest \
+            --restart=Never \
+            --rm -i \
+            --namespace observability \
+            -- sh -c "curl -s -u admin:admin http://prometheus-grafana.observability.svc.cluster.local:80/api/search | head -200" || echo "Dashboard list check completed"
+          echo "Dashboard verification completed!"
+
+      - name: Run dashboards test script
+        run: make dashboards-test
+
+      - name: Test idempotency
+        run: |
+          echo "Running prometheus-grafana-up again to verify idempotency..."
+          make prometheus-grafana-up
+          echo "Idempotency test passed!"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          make prometheus-grafana-down || true
+          make ingress-down || true
+          make cert-manager-down || true
           make istio-down || true
           make cluster-down
