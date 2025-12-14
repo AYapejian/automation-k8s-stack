@@ -81,6 +81,26 @@ curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 
 Ensure Docker is running before executing `make stack-up`.
 
+## Development with Devcontainer (Recommended)
+
+For the best development experience, especially when using Claude Code AI assistance, use the included devcontainer:
+
+1. Install [VS Code Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+2. Set `ANTHROPIC_API_KEY` in your shell profile (`~/.zshrc` or `~/.bashrc`)
+3. Open project in VS Code → "Reopen in Container"
+4. Run Claude Code with full permissions (safe in container isolation):
+   ```bash
+   claude --dangerously-skip-permissions
+   ```
+
+**Benefits:**
+- Pre-installed k3d, kubectl, helm, jq, yq
+- Persistent kubeconfig and Claude config across rebuilds
+- Direct access to k3d cluster via host networking
+- Container isolation enables safe AI-assisted development
+
+See [.devcontainer/README.md](.devcontainer/README.md) for full documentation.
+
 ## Using kubectl with the Cluster
 
 After the cluster is running, set your kubeconfig context:

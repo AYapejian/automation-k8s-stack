@@ -1,0 +1,128 @@
+{
+  // =============================================================================
+  // Devcontainer Configuration for automation-k8s-stack
+  // =============================================================================
+  // This configuration creates a containerized development environment optimized
+  // for k3d-based Kubernetes development with Claude Code AI assistance.
+  //
+  // SECURITY MODEL:
+  // - Container isolation provides the security boundary
+  // - Docker socket mounted for k3d access (containers run on host Docker)
+  // - No network firewall (simpler, faster startup)
+  // - Safe to use: claude --dangerously-skip-permissions
+  //
+  // TEMPLATING NOTES (for future extraction):
+  // - name: Change per project
+  // - mounts: Volume names should be project-specific to avoid conflicts
+  // - Helm repos in Dockerfile: Move to post-create.sh for templates
+  // - VS Code extensions: Adjust based on project tech stack
+  // =============================================================================
+
+  "name": "automation-k8s-dev",
+
+  // Build configuration
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+
+  // =============================================================================
+  // Docker Integration
+  // =============================================================================
+  // Uses "Docker outside of Docker" pattern - mounts host's Docker socket
+  // This allows k3d to create containers on the host Docker daemon
+  // Benefits: Faster, reuses image cache, native registry access
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+
+  // =============================================================================
+  // Volume Mounts
+  // =============================================================================
+  // TEMPLATE: Change volume name prefixes for different projects
+  "mounts": [
+    // Docker socket for k3d access
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
+    // Persist kubeconfig across container rebuilds
+    "source=automation-k8s-kube,target=/home/vscode/.kube,type=volume",
+    // Persist Claude Code config and auth across container rebuilds
+    "source=automation-k8s-claude,target=/home/vscode/.claude,type=volume",
+    // Persist shell history
+    "source=automation-k8s-history,target=/home/vscode/.bash_history_dir,type=volume"
+  ],
+
+  // =============================================================================
+  // Container Runtime Options
+  // =============================================================================
+  "runArgs": [
+    // Host networking for direct access to k3d ports (8080, 8443, 5111)
+    // This simplifies localhost access to services
+    "--network=host"
+  ],
+
+  // =============================================================================
+  // Environment Variables
+  // =============================================================================
+  "containerEnv": {
+    // Explicit Docker socket path
+    "DOCKER_HOST": "unix:///var/run/docker.sock",
+    // Inject Anthropic API key from host environment
+    // Set this in your shell profile: export ANTHROPIC_API_KEY="sk-ant-..."
+    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}",
+    // Optional: GitHub token for gh CLI (alternatively use 'gh auth login')
+    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"
+  },
+
+  // =============================================================================
+  // Lifecycle Scripts
+  // =============================================================================
+  // postCreateCommand: Runs once after container is created
+  "postCreateCommand": "bash .devcontainer/scripts/post-create.sh",
+  // postStartCommand: Runs on every container start
+  "postStartCommand": "bash .devcontainer/scripts/post-start.sh",
+
+  // =============================================================================
+  // User Configuration
+  // =============================================================================
+  // Run as vscode user (non-root, created by base image)
+  "remoteUser": "vscode",
+
+  // =============================================================================
+  // VS Code Customizations
+  // =============================================================================
+  // TEMPLATE: Adjust extensions based on project tech stack
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // Kubernetes support
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        // YAML validation (essential for K8s manifests)
+        "redhat.vscode-yaml",
+        // Docker support
+        "ms-azuretools.vscode-docker",
+        // GitLens for git history
+        "eamodio.gitlens",
+        // Markdown preview
+        "yzhang.markdown-all-in-one"
+      ],
+      "settings": {
+        // Terminal configuration
+        "terminal.integrated.defaultProfile.linux": "bash",
+        // Kubernetes extension settings
+        "vs-kubernetes": {
+          "vs-kubernetes.knownKubeconfigs": [
+            "/home/vscode/.kube/config"
+          ],
+          "vs-kubernetes.kubeconfig": "/home/vscode/.kube/config"
+        },
+        // YAML settings for Kubernetes
+        "yaml.schemas": {
+          "kubernetes": ["/*.yaml", "/*.yml"]
+        },
+        // Editor settings
+        "editor.formatOnSave": true,
+        "files.trimTrailingWhitespace": true
+      }
+    }
+  }
+}
