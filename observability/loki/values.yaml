@@ -1,0 +1,116 @@
+# Loki-Stack Helm values for k3d
+# https://github.com/grafana/helm-charts/tree/main/charts/loki-stack
+#
+# Bundled Loki + Promtail for simple local development.
+
+# Loki configuration
+loki:
+  enabled: true
+  isDefault: false  # We create our own datasource ConfigMap
+
+  # Resource limits for k3d
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  # Persistence - disabled for k3d (ephemeral)
+  persistence:
+    enabled: false
+
+  # Loki config overrides
+  config:
+    auth_enabled: false
+
+    ingester:
+      chunk_idle_period: 3m
+      chunk_block_size: 262144
+      chunk_retain_period: 1m
+      max_transfer_retries: 0
+      lifecycler:
+        ring:
+          replication_factor: 1
+
+    limits_config:
+      retention_period: 24h
+      enforce_metric_name: false
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+      max_entries_limit_per_query: 5000
+
+    schema_config:
+      configs:
+        - from: 2020-10-24
+          store: boltdb-shipper
+          object_store: filesystem
+          schema: v11
+          index:
+            prefix: index_
+            period: 24h
+
+    storage_config:
+      boltdb_shipper:
+        active_index_directory: /data/loki/boltdb-shipper-active
+        cache_location: /data/loki/boltdb-shipper-cache
+        cache_ttl: 24h
+        shared_store: filesystem
+      filesystem:
+        directory: /data/loki/chunks
+
+    compactor:
+      working_directory: /data/loki/boltdb-shipper-compactor
+      shared_store: filesystem
+
+    table_manager:
+      retention_deletes_enabled: true
+      retention_period: 24h
+
+# Promtail configuration
+promtail:
+  enabled: true
+
+  # Resource limits for k3d
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+  # Tolerations to run on all nodes
+  tolerations:
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+  # Config overrides
+  config:
+    clients:
+      - url: http://{{ .Release.Name }}:3100/loki/api/v1/push
+
+# Disable Grafana (we have our own)
+grafana:
+  enabled: false
+
+# Disable Prometheus (we have our own)
+prometheus:
+  enabled: false
+
+# Disable Fluent-bit
+fluent-bit:
+  enabled: false
+
+# Disable Filebeat
+filebeat:
+  enabled: false
+
+# Disable Logstash
+logstash:
+  enabled: false

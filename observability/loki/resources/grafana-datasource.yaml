@@ -1,0 +1,28 @@
+# Loki datasource for Grafana
+# This ConfigMap is auto-discovered by Grafana's sidecar
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-loki
+  namespace: observability
+  labels:
+    grafana_datasource: "1"  # Enables auto-discovery by Grafana sidecar
+data:
+  loki-datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        uid: loki
+        access: proxy
+        url: http://loki.observability.svc.cluster.local:3100
+        isDefault: false
+        jsonData:
+          maxLines: 1000
+          derivedFields:
+            # Link logs to traces (Phase 3.3)
+            - name: TraceID
+              matcherRegex: '"trace_id":"([a-f0-9]+)"'
+              url: '$${__value.raw}'
+              datasourceUid: tempo
+              urlDisplayLabel: 'View Trace'

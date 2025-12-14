@@ -1,4 +1,4 @@
-.PHONY: help cluster-up cluster-down cluster-status istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status test lint clean
+.PHONY: help cluster-up cluster-down cluster-status istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status test lint clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -159,6 +159,26 @@ prometheus-grafana-status: ## Show Prometheus + Grafana status
 	@echo "Access URLs:"
 	@echo "  Grafana:    https://grafana.localhost:8443"
 	@echo "  Prometheus: https://prometheus.localhost:8443"
+
+loki-up: ## Install Loki + Promtail for log aggregation (idempotent)
+	@$(SCRIPTS_DIR)/loki-up.sh
+
+loki-down: ## Uninstall Loki + Promtail (idempotent)
+	@$(SCRIPTS_DIR)/loki-down.sh --force
+
+loki-status: ## Show Loki + Promtail status
+	@echo "Checking Loki + Promtail status..."
+	@echo ""
+	@echo "Helm releases:"
+	@helm list -n observability 2>/dev/null | grep -E "loki|promtail" || echo "  (not installed)"
+	@echo ""
+	@echo "Loki pods:"
+	@kubectl get pods -n observability -l app=loki,release=loki 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Promtail pods:"
+	@kubectl get pods -n observability -l app.kubernetes.io/name=promtail 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Query logs in Grafana: https://grafana.localhost:8443 -> Explore -> Loki"
 
 ##@ Testing
 
