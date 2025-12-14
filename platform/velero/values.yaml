@@ -4,6 +4,9 @@
 # Configured to use Minio as S3-compatible backup storage.
 # No volume snapshots (k3d local-path doesn't support CSI snapshots).
 
+# Skip CRD upgrade job (can cause issues with image pull)
+upgradeCRDs: false
+
 # Velero configuration
 configuration:
   # Backup storage location pointing to Minio

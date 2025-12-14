@@ -47,8 +47,11 @@ COMPONENTS=(
     "istio-up:Installing Istio service mesh"
     "cert-manager-up:Installing cert-manager"
     "ingress-up:Configuring Istio Gateway and TLS"
+    "minio-up:Installing Minio object storage"
     "prometheus-grafana-up:Installing Prometheus + Grafana"
     "loki-up:Installing Loki + Promtail"
+    "tracing-up:Installing distributed tracing"
+    "velero-up:Installing Velero backup system"
 )
 
 # Deploy a single component
@@ -88,10 +91,15 @@ print_urls() {
     echo "              Password: admin"
     echo ""
     echo "  Prometheus: https://prometheus.localhost:8443"
+    echo "  Jaeger:     https://jaeger.localhost:8443"
+    echo "  Minio:      https://minio.localhost:8443"
+    echo "              Username: minioadmin"
+    echo "              Password: minioadmin123"
     echo ""
     echo -e "${BOLD}Grafana Features:${NC}"
     echo "  - Explore -> Prometheus: Query metrics"
     echo "  - Explore -> Loki: Query logs"
+    echo "  - Explore -> Tempo: Query traces"
     echo "  - Dashboards: Pre-configured Kubernetes dashboards"
     echo ""
 }

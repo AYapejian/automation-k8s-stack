@@ -55,8 +55,11 @@ done
 # Format: "script-name:description"
 COMPONENTS=(
     "sample-app-down:Removing sample application (if exists)"
+    "velero-down:Uninstalling Velero backup system"
+    "tracing-down:Uninstalling distributed tracing"
     "loki-down:Uninstalling Loki + Promtail"
     "prometheus-grafana-down:Uninstalling Prometheus + Grafana"
+    "minio-down:Uninstalling Minio object storage"
     "ingress-down:Removing Istio Gateway configuration"
     "cert-manager-down:Uninstalling cert-manager"
     "istio-down:Uninstalling Istio"

@@ -53,10 +53,11 @@ tempo:
           endpoint: "0.0.0.0:4317"
         http:
           endpoint: "0.0.0.0:4318"
-    # Disable other receivers
-    jaeger: null
-    opencensus: null
-    zipkin: null
+    # Explicitly disable other receivers with empty config
+    jaeger:
+      protocols: {}
+    opencensus: {}
+    zipkin: {}
 
 # Persistence for WAL
 persistence:

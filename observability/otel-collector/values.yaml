@@ -4,6 +4,10 @@
 
 mode: deployment
 
+# Image configuration (required by chart 0.141.0+)
+image:
+  repository: otel/opentelemetry-collector-contrib
+
 # Resource limits for k3d
 resources:
   requests:
