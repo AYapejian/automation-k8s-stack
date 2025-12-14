@@ -1,0 +1,67 @@
+# Velero Helm values for k3d
+# https://github.com/vmware-tanzu/helm-charts/tree/main/charts/velero
+#
+# Configured to use Minio as S3-compatible backup storage.
+# No volume snapshots (k3d local-path doesn't support CSI snapshots).
+
+# Velero configuration
+configuration:
+  # Backup storage location pointing to Minio
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: velero
+      config:
+        region: minio
+        s3ForcePathStyle: "true"
+        s3Url: http://minio.minio.svc.cluster.local:9000
+        publicUrl: http://minio.minio.svc.cluster.local:9000
+
+  # No volume snapshot location (k3d doesn't support CSI snapshots)
+  volumeSnapshotLocation: []
+
+  # Use Restic for file-level backups (alternative to snapshots)
+  uploaderType: restic
+
+# AWS plugin for S3-compatible storage
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.10.0
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+# Use pre-created credentials secret
+credentials:
+  useSecret: true
+  existingSecret: velero-minio-credentials
+
+# k3d-optimized resources
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Node agent (restic) for file-level backups
+deployNodeAgent: true
+nodeAgent:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Disable scheduled cleanup jobs (manual for k3d)
+schedules: {}
+
+# Service configuration
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false  # Can enable if prometheus-operator is installed
