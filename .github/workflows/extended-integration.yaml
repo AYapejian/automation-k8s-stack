@@ -1,10 +1,25 @@
-name: CI
+name: Extended Integration
+
+# Full integration tests - runs on merge to main, nightly, or observability PRs
+# For fast PR validation, see pr-validation.yaml
 
 on:
-  pull_request:
-    branches: [main]
   push:
     branches: [main]
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6 AM UTC
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'observability/**'
+      - 'platform/minio/**'
+      - 'platform/velero/**'
+      - 'scripts/prometheus-*.sh'
+      - 'scripts/loki-*.sh'
+      - 'scripts/tracing-*.sh'
+      - 'scripts/minio-*.sh'
+      - 'scripts/velero-*.sh'
 
 jobs:
   lint:
@@ -29,11 +44,11 @@ jobs:
       - name: Show make targets
         run: make help
 
-  # Core platform integration test - validates essential components
-  # Note: Loki, Tracing, and Velero are excluded due to resource constraints
-  # in CI runners. These components are validated locally.
+  # Extended integration test - validates full stack including observability
+  # Includes Minio, Prometheus, Grafana, and idempotency tests
+  # Note: Loki, Tracing, and Velero excluded due to CI runner resource constraints
   integration-test:
-    name: Platform Integration
+    name: Extended Integration
     runs-on: ubuntu-latest
     needs: lint
     timeout-minutes: 25

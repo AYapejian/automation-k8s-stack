@@ -1,0 +1,117 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'specs/**'
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate YAML syntax
+        run: |
+          echo "Checking for YAML syntax errors..."
+          find . -name '*.yaml' -o -name '*.yml' | while read file; do
+            python3 -c "import yaml; yaml.safe_load(open('$file'))" 2>/dev/null || echo "Warning: $file may have issues"
+          done
+          echo "YAML validation complete"
+
+      - name: Validate Makefile exists
+        run: |
+          test -f Makefile && echo "Makefile exists" || exit 1
+
+      - name: Show make targets
+        run: make help
+
+  # Fast core platform test - validates essential components only
+  # Full observability stack tested in extended-integration.yaml
+  core-platform-test:
+    name: Core Platform Test
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install prerequisites
+        run: |
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          k3d version
+          helm version
+          jq --version
+
+      - name: Create k3d cluster
+        run: make cluster-up
+
+      # ===== PLATFORM LAYER =====
+      - name: Install Istio
+        run: make istio-up
+
+      - name: Verify Istio
+        run: |
+          kubectl wait --for=condition=Ready pods --all -n istio-system --timeout=120s
+          kubectl wait --for=condition=Ready pods --all -n istio-ingress --timeout=120s
+          # Verify mTLS
+          MTLS_MODE=$(kubectl get peerauthentication default -n istio-system -o jsonpath='{.spec.mtls.mode}')
+          [ "$MTLS_MODE" = "STRICT" ] && echo "mTLS STRICT verified"
+
+      - name: Install cert-manager
+        run: make cert-manager-up
+
+      - name: Verify cert-manager
+        run: |
+          kubectl wait --for=condition=Ready pods --all -n cert-manager --timeout=120s
+          kubectl wait --for=condition=Ready clusterissuer/selfsigned-issuer --timeout=60s
+          kubectl wait --for=condition=Ready clusterissuer/automation-ca-issuer --timeout=60s
+
+      - name: Configure ingress
+        run: make ingress-up
+
+      - name: Verify ingress certificate
+        run: |
+          kubectl wait --for=condition=Ready certificate/gateway-tls -n istio-ingress --timeout=120s
+          kubectl get secret gateway-tls-secret -n istio-ingress
+
+      # ===== SAMPLE APP TEST =====
+      - name: Deploy sample app
+        run: make sample-app-up
+
+      - name: Test ingress routing
+        run: |
+          kubectl wait --for=condition=Ready pods -l app=httpbin -n ingress-sample --timeout=120s
+          # Test HTTPS
+          RESPONSE=$(curl -sk -H "Host: httpbin.localhost" https://localhost:8443/get)
+          echo "$RESPONSE" | jq -e '.url' && echo "HTTPS routing verified"
+          # Verify sidecar injection
+          CONTAINERS=$(kubectl get pod -l app=httpbin -n ingress-sample -o jsonpath='{.items[0].spec.containers[*].name}')
+          echo "$CONTAINERS" | grep -q "istio-proxy" && echo "Sidecar injection verified"
+
+      # ===== SUMMARY =====
+      - name: Print stack status
+        if: always()
+        run: |
+          echo "=== Final Stack Status ==="
+          kubectl get pods -A | grep -v "Completed" || true
+          echo ""
+          echo "=== Helm Releases ==="
+          helm list -A || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          make sample-app-down || true
+          make ingress-down || true
+          make cert-manager-down || true
+          make istio-down || true
+          make cluster-down
