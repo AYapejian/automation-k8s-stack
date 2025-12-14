@@ -155,11 +155,10 @@ jobs:
       - name: Test MQTT connectivity
         run: |
           echo "Testing MQTT broker connectivity..."
-          kubectl run mqtt-test \
-            --image=eclipse-mosquitto:2.0.18 \
-            --restart=Never --rm -i --quiet \
-            --namespace home-automation \
-            -- mosquitto_pub -h mosquitto -p 1883 -t "ci/test" -m "hello" -q 1
+          # Use kubectl exec on mosquitto pod to test MQTT is accepting connections
+          MQTT_POD=$(kubectl get pods -n home-automation -l app.kubernetes.io/name=mosquitto -o jsonpath='{.items[0].metadata.name}')
+          kubectl exec -n home-automation "$MQTT_POD" -c mosquitto -- \
+            mosquitto_pub -h localhost -p 1883 -t "ci/test" -m "hello" -q 1
           echo "MQTT connectivity verified"
 
       # ===== IDEMPOTENCY TESTS =====

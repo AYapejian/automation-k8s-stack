@@ -83,21 +83,22 @@ test_sidecar_injection() {
 test_mqtt_connectivity() {
     log_info "Testing: MQTT broker connectivity..."
 
-    # Check if mosquitto service is accessible
-    local mqtt_endpoint="mosquitto.${NAMESPACE}.svc.cluster.local"
+    local mqtt_pod
+    mqtt_pod=$(kubectl get pods -n "${NAMESPACE}" -l "app.kubernetes.io/name=mosquitto" \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 
-    # Run a test pod to verify MQTT connectivity
-    kubectl run mqtt-test \
-        --image=eclipse-mosquitto:2.0.18 \
-        --restart=Never \
-        --rm \
-        -i \
-        --quiet \
-        --namespace "${NAMESPACE}" \
-        --command -- \
-        mosquitto_pub -h mosquitto -p 1883 -t "test/connectivity" -m "test" -q 1 2>/dev/null && \
-        log_pass "MQTT broker accepts connections" || \
+    if [[ -z "${mqtt_pod}" ]]; then
+        log_fail "Mosquitto pod not found"
+        return
+    fi
+
+    # Use kubectl exec on mosquitto pod to test connectivity
+    if kubectl exec -n "${NAMESPACE}" "${mqtt_pod}" -c mosquitto -- \
+        mosquitto_pub -h localhost -p 1883 -t "test/connectivity" -m "test" -q 1 2>/dev/null; then
+        log_pass "MQTT broker accepts connections"
+    else
         log_fail "MQTT broker not responding"
+    fi
 }
 
 # Test: HomeAssistant API
