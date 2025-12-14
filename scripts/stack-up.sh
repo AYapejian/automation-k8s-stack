@@ -96,6 +96,13 @@ print_urls() {
     echo ""
 }
 
+# Print kubeconfig instructions
+print_kubeconfig() {
+    echo -e "${BOLD}Set kubectl context:${NC}"
+    echo "  export KUBECONFIG=\$(k3d kubeconfig write ${CLUSTER_NAME})"
+    echo ""
+}
+
 # Print optional next steps
 print_next_steps() {
     echo -e "${BOLD}Optional: Deploy sample application${NC}"
@@ -138,6 +145,7 @@ main() {
     local seconds=$((duration % 60))
 
     print_urls
+    print_kubeconfig
     print_next_steps
 
     log_info "Total deployment time: ${minutes}m ${seconds}s"

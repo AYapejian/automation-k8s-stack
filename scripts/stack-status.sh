@@ -203,6 +203,10 @@ main() {
     fi
     echo ""
 
+    echo -e "${BOLD}Set kubectl context:${NC}"
+    echo "  export KUBECONFIG=\$(k3d kubeconfig write ${CLUSTER_NAME})"
+    echo ""
+
     exit ${overall_status}
 }
 

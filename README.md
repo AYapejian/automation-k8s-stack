@@ -81,6 +81,23 @@ curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 
 Ensure Docker is running before executing `make stack-up`.
 
+## Using kubectl with the Cluster
+
+After the cluster is running, set your kubeconfig context:
+
+```bash
+# Option 1: Use the helper target (recommended)
+eval $(make kubeconfig)
+
+# Option 2: Set KUBECONFIG manually
+export KUBECONFIG=$(k3d kubeconfig write automation-k8s)
+
+# Verify connection
+kubectl get nodes
+```
+
+The `make stack-up` and `make stack-status` commands will display this export command in their output.
+
 ## All Commands
 
 ```bash
