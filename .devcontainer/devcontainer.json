@@ -69,7 +69,9 @@
     // Explicit Docker socket path
     "DOCKER_HOST": "unix:///var/run/docker.sock",
     // Optional: GitHub token for gh CLI (alternatively use 'gh auth login')
-    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"
+    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}",
+    // Point kubectl directly to k3d config (avoids ~/.kube volume permission issues)
+    "KUBECONFIG": "/home/vscode/.config/k3d/kubeconfig-automation-k8s.yaml"
     // NOTE: Claude Max users don't need ANTHROPIC_API_KEY - OAuth credentials
     // are shared via the ~/.claude bind mount above
   },
