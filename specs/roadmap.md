@@ -12,6 +12,7 @@ Each phase represents a logical unit of work. Each numbered item should be imple
 | Time-series DB | Prometheus only | Drop InfluxDB; HA Prometheus integration covers metrics |
 | GitOps | ArgoCD | Feature-rich, good UI, widely adopted |
 | Secrets | Sealed Secrets | Simple, git-native, testable offline, easy to migrate |
+| CI Workflows | Tiered (fast PR + extended) | 88% faster PR feedback; full tests on merge/nightly |
 
 ---
 
@@ -89,6 +90,22 @@ Each phase represents a logical unit of work. Each numbered item should be imple
 - [ ] Controller deploys in cluster
 - [ ] Can seal/unseal secrets in CI without interaction
 - [ ] Test validates a sealed secret decrypts correctly
+
+### 1.5 CI Optimization
+**Branch**: `feature/ci-optimization`
+
+- Split CI into tiered workflows for faster PR feedback
+- Created two workflow architecture:
+  - `pr-validation.yaml` - Fast PR checks (~3 min)
+  - `extended-integration.yaml` - Full stack tests (~6 min)
+- Path-based triggers for observability PRs
+- Nightly scheduled runs for drift detection
+
+**Acceptance Criteria**:
+- [x] PR validation completes in under 6 minutes
+- [x] Extended integration runs on merge to main
+- [x] Observability PRs trigger full integration tests
+- [x] Nightly schedule configured (6 AM UTC)
 
 ---
 
