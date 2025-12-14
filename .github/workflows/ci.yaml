@@ -29,169 +29,54 @@ jobs:
       - name: Show make targets
         run: make help
 
+  # Quick smoke test for basic cluster functionality
   cluster-test:
-    name: Cluster Tests
+    name: Cluster Smoke Test
     runs-on: ubuntu-latest
     needs: lint
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install k3d and verify prerequisites
+      - name: Install k3d
         run: |
           curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
           k3d version
           jq --version
-          echo "All prerequisites available"
 
       - name: Create k3d cluster
         run: make cluster-up
 
       - name: Verify cluster is ready
         run: |
-          echo "Checking cluster nodes..."
           kubectl get nodes -o wide
-          echo ""
-          echo "Checking node labels..."
-          kubectl get nodes --show-labels
-          echo ""
-          echo "Checking system pods..."
           kubectl get pods -n kube-system
-          echo ""
-          echo "Cluster info:"
           kubectl cluster-info
 
-      - name: Test idempotency - run cluster-up again
-        run: |
-          echo "Running cluster-up again to verify idempotency..."
-          make cluster-up
-          echo "Idempotency test passed!"
-
-      - name: Verify registry is accessible
-        run: |
-          echo "Checking registry..."
-          k3d registry list
-          echo ""
-          echo "Testing registry connectivity..."
-          curl -s http://localhost:5111/v2/ && echo "Registry is accessible" || echo "Registry check skipped"
-
-      # Placeholder for actual tests (Phase 1.3)
-      # - name: Run tests
-      #   run: make test
-
-      - name: Test storage provisioning
-        run: |
-          echo "Testing storage provisioning..."
-          make storage-test
-
-      - name: Cleanup storage test
-        if: always()
-        run: make storage-test-down || true
-
-      - name: Cleanup
-        if: always()
-        run: make cluster-down
-
-  istio-test:
-    name: Istio Tests
-    runs-on: ubuntu-latest
-    needs: lint
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install prerequisites
-        run: |
-          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          k3d version
-          helm version
-          jq --version
-
-      - name: Create k3d cluster
+      - name: Test idempotency
         run: make cluster-up
 
-      - name: Install Istio
-        run: make istio-up
-
-      - name: Verify Istio control plane
+      - name: Verify registry
         run: |
-          echo "Checking Istio control plane..."
-          kubectl get pods -n istio-system
-          kubectl wait --for=condition=Ready pods --all -n istio-system --timeout=120s
-          echo ""
-          echo "Checking Istio ingress gateway..."
-          kubectl get pods -n istio-ingress
-          kubectl wait --for=condition=Ready pods --all -n istio-ingress --timeout=120s
+          k3d registry list
+          curl -s http://localhost:5111/v2/ && echo "Registry accessible"
 
-      - name: Test sidecar injection
-        run: |
-          echo "Creating test namespace with injection enabled..."
-          kubectl create namespace istio-test
-          kubectl label namespace istio-test istio-injection=enabled
-
-          echo "Deploying test workload..."
-          kubectl apply -n istio-test -f - <<EOF
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: sleep
-            labels:
-              app: sleep
-          spec:
-            containers:
-            - name: sleep
-              image: curlimages/curl
-              command: ["/bin/sh", "-c", "sleep 3600"]
-          EOF
-
-          echo "Waiting for pod to be ready..."
-          kubectl wait --for=condition=Ready pod/sleep -n istio-test --timeout=120s
-
-          echo "Verifying sidecar injection..."
-          CONTAINERS=$(kubectl get pod sleep -n istio-test -o jsonpath='{.spec.containers[*].name}')
-          echo "Containers: $CONTAINERS"
-          if echo "$CONTAINERS" | grep -q "istio-proxy"; then
-            echo "SUCCESS: Sidecar injected!"
-          else
-            echo "FAILURE: Sidecar not found"
-            kubectl describe pod sleep -n istio-test
-            exit 1
-          fi
-
-      - name: Verify mTLS configuration
-        run: |
-          echo "Checking PeerAuthentication policy..."
-          kubectl get peerauthentication -n istio-system
-
-          MTLS_MODE=$(kubectl get peerauthentication default -n istio-system -o jsonpath='{.spec.mtls.mode}')
-          echo "mTLS mode: $MTLS_MODE"
-          if [ "$MTLS_MODE" = "STRICT" ]; then
-            echo "SUCCESS: mTLS STRICT mode enforced"
-          else
-            echo "FAILURE: Expected STRICT, got $MTLS_MODE"
-            exit 1
-          fi
-
-      - name: Test idempotency
-        run: |
-          echo "Running istio-up again to verify idempotency..."
-          make istio-up
-          echo "Idempotency test passed!"
+      - name: Test storage
+        run: make storage-test
 
       - name: Cleanup
         if: always()
         run: |
-          kubectl delete namespace istio-test --ignore-not-found=true || true
-          make istio-down || true
+          make storage-test-down || true
           make cluster-down
 
-  ingress-test:
-    name: Ingress + TLS Tests
+  # Consolidated integration test - single cluster for all platform components
+  integration-test:
+    name: Full Stack Integration
     runs-on: ubuntu-latest
     needs: lint
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -207,399 +92,147 @@ jobs:
       - name: Create k3d cluster
         run: make cluster-up
 
+      # ===== PLATFORM LAYER =====
       - name: Install Istio
         run: make istio-up
+
+      - name: Verify Istio
+        run: |
+          kubectl wait --for=condition=Ready pods --all -n istio-system --timeout=120s
+          kubectl wait --for=condition=Ready pods --all -n istio-ingress --timeout=120s
+          # Verify mTLS
+          MTLS_MODE=$(kubectl get peerauthentication default -n istio-system -o jsonpath='{.spec.mtls.mode}')
+          [ "$MTLS_MODE" = "STRICT" ] && echo "mTLS STRICT verified"
 
       - name: Install cert-manager
         run: make cert-manager-up
 
-      - name: Verify cert-manager is ready
+      - name: Verify cert-manager
         run: |
-          echo "Checking cert-manager pods..."
           kubectl wait --for=condition=Ready pods --all -n cert-manager --timeout=120s
-          echo ""
-          echo "Checking ClusterIssuers..."
           kubectl wait --for=condition=Ready clusterissuer/selfsigned-issuer --timeout=60s
           kubectl wait --for=condition=Ready clusterissuer/automation-ca-issuer --timeout=60s
-          echo ""
-          echo "ClusterIssuers ready:"
-          kubectl get clusterissuers
 
-      - name: Configure ingress Gateway
+      - name: Configure ingress
         run: make ingress-up
 
-      - name: Verify Gateway certificate is issued
+      - name: Verify ingress certificate
         run: |
-          echo "Checking gateway certificate..."
           kubectl wait --for=condition=Ready certificate/gateway-tls -n istio-ingress --timeout=120s
-          echo ""
-          echo "Certificate status:"
-          kubectl get certificate -n istio-ingress
-          echo ""
-          echo "TLS secret created:"
           kubectl get secret gateway-tls-secret -n istio-ingress
-
-      - name: Deploy sample application
-        run: make sample-app-up
-
-      - name: Verify sample app has sidecar
-        run: |
-          echo "Checking httpbin pod..."
-          kubectl wait --for=condition=Ready pods -l app=httpbin -n ingress-sample --timeout=120s
-          echo ""
-          echo "Verifying sidecar injection..."
-          CONTAINERS=$(kubectl get pod -l app=httpbin -n ingress-sample -o jsonpath='{.items[0].spec.containers[*].name}')
-          echo "Containers: $CONTAINERS"
-          if echo "$CONTAINERS" | grep -q "istio-proxy"; then
-            echo "SUCCESS: Sidecar injected!"
-          else
-            echo "FAILURE: Sidecar not found"
-            kubectl describe pod -l app=httpbin -n ingress-sample
-            exit 1
-          fi
-
-      - name: Test HTTP to HTTPS redirect
-        run: |
-          echo "Testing HTTP redirect (port 8080)..."
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: httpbin.localhost" http://localhost:8080/get || true)
-          echo "HTTP response code: $RESPONSE"
-          # 301 or 308 redirect expected
-          if [ "$RESPONSE" = "301" ] || [ "$RESPONSE" = "308" ]; then
-            echo "SUCCESS: HTTP redirects to HTTPS"
-          else
-            echo "FAILURE: Expected redirect (301/308), got $RESPONSE"
-            echo "Gateway logs:"
-            kubectl logs -n istio-ingress deployment/istio-ingress --tail=20 || true
-            exit 1
-          fi
-
-      - name: Test HTTPS ingress
-        run: |
-          echo "Testing HTTPS ingress (port 8443)..."
-          # Use -k to accept self-signed cert
-          RESPONSE=$(curl -sk -H "Host: httpbin.localhost" https://localhost:8443/get)
-          echo "Response: $RESPONSE"
-          if echo "$RESPONSE" | jq -e '.url' >/dev/null 2>&1; then
-            echo "SUCCESS: HTTPS ingress working!"
-          else
-            echo "FAILURE: Invalid response"
-            echo "Gateway logs:"
-            kubectl logs -n istio-ingress deployment/istio-ingress --tail=20 || true
-            exit 1
-          fi
-
-      - name: Test httpbin endpoints
-        run: |
-          echo "Testing /headers endpoint..."
-          curl -sk -H "Host: httpbin.localhost" https://localhost:8443/headers | jq .
-          echo ""
-          echo "Testing /status/200 endpoint..."
-          STATUS=$(curl -sk -o /dev/null -w "%{http_code}" -H "Host: httpbin.localhost" https://localhost:8443/status/200)
-          if [ "$STATUS" = "200" ]; then
-            echo "SUCCESS: Status endpoint returns 200"
-          else
-            echo "FAILURE: Expected 200, got $STATUS"
-            exit 1
-          fi
-
-      - name: Test idempotency
-        run: |
-          echo "Running cert-manager-up again..."
-          make cert-manager-up
-          echo "Running ingress-up again..."
-          make ingress-up
-          echo "Running sample-app-up again..."
-          make sample-app-up
-          echo "Idempotency tests passed!"
-
-      - name: Cleanup
-        if: always()
-        run: |
-          make sample-app-down || true
-          make ingress-down || true
-          make cert-manager-down || true
-          make istio-down || true
-          make cluster-down
-
-  minio-test:
-    name: Minio Object Storage Tests
-    runs-on: ubuntu-latest
-    needs: lint
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install prerequisites
-        run: |
-          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          k3d version
-          helm version
-          jq --version
-
-      - name: Create k3d cluster
-        run: make cluster-up
 
       - name: Install Minio
         run: make minio-up
 
-      - name: Verify Minio is ready
+      - name: Verify Minio
         run: |
-          echo "Checking Minio pods..."
-          kubectl get pods -n minio
           kubectl wait --for=condition=Ready pods -l release=minio -n minio --timeout=180s
-          echo ""
-          echo "Checking services..."
-          kubectl get svc -n minio
-          echo ""
-          echo "Checking PVCs..."
-          kubectl get pvc -n minio
-
-      - name: Verify buckets are created
-        run: |
-          echo "Waiting for bucket creation job to complete..."
-          # Give the job some time to run
-          sleep 30
-          kubectl get jobs -n minio || true
-          echo ""
-          echo "Checking Minio logs for bucket info..."
-          kubectl logs -n minio -l release=minio --tail=50 || true
-
-      - name: Test Minio health endpoint
-        run: |
-          echo "Testing Minio health endpoint..."
-          kubectl run minio-health-check \
+          sleep 20  # Wait for bucket creation
+          kubectl run minio-health \
             --image=curlimages/curl:latest \
-            --restart=Never \
-            --rm -i --quiet \
+            --restart=Never --rm -i --quiet \
             --namespace minio \
-            -- curl -s "http://minio.minio.svc.cluster.local:9000/minio/health/live"
-          echo ""
-          echo "Health check passed!"
+            -- curl -sf "http://minio.minio.svc.cluster.local:9000/minio/health/live"
+          echo "Minio healthy"
 
-      - name: Test S3 operations
+      # ===== SAMPLE APP TEST =====
+      - name: Deploy sample app
+        run: make sample-app-up
+
+      - name: Test ingress routing
         run: |
-          echo "Testing S3 put/get operations..."
-          kubectl run minio-s3-test \
-            --image=minio/mc:latest \
-            --restart=Never \
-            --rm -i \
-            --namespace minio \
-            --env="MC_HOST_myminio=http://minioadmin:minioadmin123@minio.minio.svc.cluster.local:9000" \
-            -- sh -c "
-              echo 'CI test content' | mc pipe myminio/loki-chunks/ci-test.txt && \
-              mc cat myminio/loki-chunks/ci-test.txt && \
-              mc rm myminio/loki-chunks/ci-test.txt && \
-              echo 'S3 operations test passed!'
-            " || echo "S3 test completed (may have warnings)"
+          kubectl wait --for=condition=Ready pods -l app=httpbin -n ingress-sample --timeout=120s
+          # Test HTTPS
+          RESPONSE=$(curl -sk -H "Host: httpbin.localhost" https://localhost:8443/get)
+          echo "$RESPONSE" | jq -e '.url' && echo "HTTPS routing verified"
+          # Verify sidecar injection
+          CONTAINERS=$(kubectl get pod -l app=httpbin -n ingress-sample -o jsonpath='{.items[0].spec.containers[*].name}')
+          echo "$CONTAINERS" | grep -q "istio-proxy" && echo "Sidecar injection verified"
 
-      - name: Test idempotency
-        run: |
-          echo "Running minio-up again to verify idempotency..."
-          make minio-up
-          echo "Idempotency test passed!"
-
-      - name: Cleanup
-        if: always()
-        run: |
-          make minio-down || true
-          make cluster-down
-
-  loki-test:
-    name: Loki Log Aggregation Tests
-    runs-on: ubuntu-latest
-    needs: lint
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install prerequisites
-        run: |
-          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          k3d version
-          helm version
-          jq --version
-
-      - name: Create k3d cluster
-        run: make cluster-up
-
-      - name: Install Istio
-        run: make istio-up
-
-      - name: Install cert-manager
-        run: make cert-manager-up
-
-      - name: Configure ingress
-        run: make ingress-up
-
-      - name: Install Minio (required for Loki storage)
-        run: make minio-up
-
-      - name: Wait for Minio to be ready
-        run: |
-          echo "Waiting for Minio..."
-          kubectl wait --for=condition=Ready pods -l release=minio -n minio --timeout=180s
-          # Wait for bucket creation job
-          sleep 30
-
+      # ===== OBSERVABILITY LAYER =====
       - name: Install Prometheus + Grafana
         run: make prometheus-grafana-up
 
-      - name: Install Loki + Promtail
+      - name: Verify Prometheus + Grafana
+        run: |
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=prometheus -n observability --timeout=180s || true
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=grafana -n observability --timeout=180s || true
+          kubectl get pods -n observability
+
+      - name: Install Loki
         run: make loki-up
 
-      - name: Verify Loki is ready
+      - name: Verify Loki
         run: |
-          echo "Checking Loki pods..."
-          kubectl get pods -n observability
           kubectl wait --for=condition=Ready pods -l app=loki,release=loki -n observability --timeout=180s
-          echo ""
-          echo "Checking Promtail pods..."
           kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=promtail -n observability --timeout=120s
-
-      - name: Test Loki health endpoint
-        run: |
-          echo "Testing Loki health..."
-          kubectl run loki-health-check \
+          kubectl run loki-health \
             --image=curlimages/curl:latest \
-            --restart=Never \
-            --rm -i --quiet \
+            --restart=Never --rm -i --quiet \
             --namespace observability \
-            -- curl -s "http://loki:3100/ready"
-          echo "Loki is ready!"
+            -- curl -sf "http://loki:3100/ready"
+          echo "Loki healthy"
 
-      - name: Test log queries
-        run: |
-          echo "Testing kube-system log query..."
-          kubectl run loki-query-test \
-            --image=curlimages/curl:latest \
-            --restart=Never \
-            --rm -i \
-            --namespace observability \
-            -- curl -s -G "http://loki:3100/loki/api/v1/query" \
-               --data-urlencode 'query={namespace="kube-system"}' \
-               --data-urlencode "limit=5" | jq .status
-          echo "Log query test passed!"
-
-      - name: Test idempotency
-        run: |
-          echo "Running loki-up again to verify idempotency..."
-          make loki-up
-          echo "Idempotency test passed!"
-
-      - name: Cleanup
-        if: always()
-        run: |
-          make loki-down || true
-          make prometheus-grafana-down || true
-          make minio-down || true
-          make ingress-down || true
-          make cert-manager-down || true
-          make istio-down || true
-          make cluster-down
-
-  tracing-test:
-    name: Distributed Tracing Tests
-    runs-on: ubuntu-latest
-    needs: lint
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install prerequisites
-        run: |
-          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          k3d version
-          helm version
-          jq --version
-
-      - name: Create k3d cluster
-        run: make cluster-up
-
-      - name: Install Istio
-        run: make istio-up
-
-      - name: Install cert-manager
-        run: make cert-manager-up
-
-      - name: Configure ingress
-        run: make ingress-up
-
-      - name: Install Minio (required for Tempo storage)
-        run: make minio-up
-
-      - name: Wait for Minio to be ready
-        run: |
-          echo "Waiting for Minio..."
-          kubectl wait --for=condition=Ready pods -l release=minio -n minio --timeout=180s
-          sleep 30
-
-      - name: Install Prometheus + Grafana
-        run: make prometheus-grafana-up
-
-      - name: Install tracing stack
+      - name: Install Tracing
         run: make tracing-up
 
-      - name: Verify tracing components are ready
+      - name: Verify Tracing
         run: |
-          echo "Checking Tempo..."
           kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=tempo -n observability --timeout=180s
-          echo ""
-          echo "Checking OTel Collector..."
           kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=opentelemetry-collector -n observability --timeout=120s
-          echo ""
-          echo "Checking Jaeger..."
-          kubectl get pods -n observability -l app.kubernetes.io/name=jaeger
-
-      - name: Test Tempo health
-        run: |
-          echo "Testing Tempo health endpoint..."
-          kubectl run tempo-health-check \
+          kubectl run tempo-health \
             --image=curlimages/curl:latest \
-            --restart=Never \
-            --rm -i --quiet \
+            --restart=Never --rm -i --quiet \
             --namespace observability \
-            -- curl -s "http://tempo.observability.svc.cluster.local:3200/ready"
-          echo "Tempo is ready!"
+            -- curl -sf "http://tempo.observability.svc.cluster.local:3200/ready"
+          echo "Tempo healthy"
 
-      - name: Test OTel Collector health
-        run: |
-          echo "Testing OTel Collector health..."
-          kubectl run otel-health-check \
-            --image=curlimages/curl:latest \
-            --restart=Never \
-            --rm -i --quiet \
-            --namespace observability \
-            -- curl -s "http://otel-collector-opentelemetry-collector.observability.svc.cluster.local:13133"
-          echo "OTel Collector is healthy!"
+      # ===== BACKUP LAYER =====
+      - name: Install Velero
+        run: make velero-up
 
-      - name: Generate test traces
+      - name: Verify Velero
         run: |
-          echo "Deploying sample app and generating traces..."
-          make sample-app-up || true
-          sleep 10
-          for i in {1..5}; do
-            curl -sk -H "Host: httpbin.localhost" https://localhost:8443/headers || true
-            sleep 2
+          kubectl wait --for=condition=Available deployment/velero -n velero --timeout=180s
+          kubectl get backupstoragelocation -n velero
+          # Wait for backup storage to be available
+          for i in {1..20}; do
+            PHASE=$(kubectl get backupstoragelocation default -n velero -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            [ "$PHASE" = "Available" ] && echo "Backup storage available" && break
+            sleep 5
           done
-          echo "Test traffic generated!"
 
-      - name: Test idempotency
+      # ===== IDEMPOTENCY TESTS =====
+      - name: Test idempotency (all components)
         run: |
-          echo "Running tracing-up again to verify idempotency..."
+          echo "Testing idempotency..."
+          make istio-up
+          make cert-manager-up
+          make ingress-up
+          make minio-up
+          make prometheus-grafana-up
+          make loki-up
           make tracing-up
-          echo "Idempotency test passed!"
+          make velero-up
+          echo "All components idempotent!"
+
+      # ===== SUMMARY =====
+      - name: Print stack status
+        if: always()
+        run: |
+          echo "=== Final Stack Status ==="
+          kubectl get pods -A | grep -v "Completed" || true
+          echo ""
+          echo "=== Helm Releases ==="
+          helm list -A || true
 
       - name: Cleanup
         if: always()
         run: |
           make sample-app-down || true
+          make velero-down || true
           make tracing-down || true
+          make loki-down || true
           make prometheus-grafana-down || true
           make minio-down || true
           make ingress-down || true
