@@ -251,3 +251,4 @@ To upgrade, update the `CHART_VERSION` variable in `scripts/velero-up.sh`.
 - [Velero Helm Chart](https://github.com/vmware-tanzu/helm-charts/tree/main/charts/velero)
 - [AWS Plugin](https://github.com/vmware-tanzu/velero-plugin-for-aws)
 - [Restic Integration](https://velero.io/docs/latest/restic/)
+# Trigger CI rebuild
