@@ -41,11 +41,10 @@
   // =============================================================================
   // TEMPLATE: Change volume name prefixes for different projects
   // NOTE: ~/.claude uses bind mount to share Claude Max OAuth credentials with host
+  // NOTE: No ~/.kube mount - kubectl uses KUBECONFIG env var pointing to k3d's config
   "mounts": [
     // Docker socket for k3d access
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
-    // Persist kubeconfig across container rebuilds
-    "source=automation-k8s-kube,target=/home/vscode/.kube,type=volume",
     // Share Claude Code config with host - enables Claude Max OAuth persistence
     // Uses bind mount so host's claude login works in container (no re-auth needed)
     "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind",
@@ -116,12 +115,12 @@
       "settings": {
         // Terminal configuration
         "terminal.integrated.defaultProfile.linux": "bash",
-        // Kubernetes extension settings
+        // Kubernetes extension settings - uses k3d's kubeconfig path
         "vs-kubernetes": {
           "vs-kubernetes.knownKubeconfigs": [
-            "/home/vscode/.kube/config"
+            "/home/vscode/.config/k3d/kubeconfig-automation-k8s.yaml"
           ],
-          "vs-kubernetes.kubeconfig": "/home/vscode/.kube/config"
+          "vs-kubernetes.kubeconfig": "/home/vscode/.config/k3d/kubeconfig-automation-k8s.yaml"
         },
         // YAML settings for Kubernetes
         "yaml.schemas": {

@@ -22,13 +22,11 @@ echo "=============================================="
 # =============================================================================
 echo "[INFO] Setting up directories..."
 
-# Ensure .kube directory exists with correct permissions
-mkdir -p ~/.kube
-chmod 700 ~/.kube
+# Note: ~/.kube is not used - kubectl uses KUBECONFIG pointing to k3d's config
+# at /home/vscode/.config/k3d/kubeconfig-automation-k8s.yaml
 
-# Ensure .claude directory exists with correct permissions
+# Ensure .claude directory exists (bind-mounted from host, so skip chmod)
 mkdir -p ~/.claude
-chmod 700 ~/.claude
 
 # Create bash history directory (for persistent history volume)
 mkdir -p ~/.bash_history_dir
