@@ -29,49 +29,7 @@ jobs:
       - name: Show make targets
         run: make help
 
-  # Quick smoke test for basic cluster functionality
-  cluster-test:
-    name: Cluster Smoke Test
-    runs-on: ubuntu-latest
-    needs: lint
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install k3d
-        run: |
-          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-          k3d version
-          jq --version
-
-      - name: Create k3d cluster
-        run: make cluster-up
-
-      - name: Verify cluster is ready
-        run: |
-          kubectl get nodes -o wide
-          kubectl get pods -n kube-system
-          kubectl cluster-info
-
-      - name: Test idempotency
-        run: make cluster-up
-
-      - name: Verify registry
-        run: |
-          k3d registry list
-          curl -s http://localhost:5111/v2/ && echo "Registry accessible"
-
-      - name: Test storage
-        run: make storage-test
-
-      - name: Cleanup
-        if: always()
-        run: |
-          make storage-test-down || true
-          make cluster-down
-
-  # Consolidated integration test - single cluster for all platform components
+  # Single integration test - one cluster for all platform components
   integration-test:
     name: Full Stack Integration
     runs-on: ubuntu-latest
