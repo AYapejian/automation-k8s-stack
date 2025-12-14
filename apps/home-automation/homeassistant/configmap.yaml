@@ -1,0 +1,37 @@
+# HomeAssistant Initial Configuration
+# This ConfigMap provides initial configuration that will be copied to /config
+# Note: HomeAssistant will manage its own config after first run
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homeassistant-initial-config
+  namespace: home-automation
+  labels:
+    app.kubernetes.io/name: homeassistant
+data:
+  # Initial configuration.yaml with Prometheus integration
+  # Note: This is for reference - actual config is managed by HA after setup
+  configuration.yaml.example: |
+    # HomeAssistant Configuration
+    # See: https://www.home-assistant.io/docs/configuration/
+
+    homeassistant:
+      name: Home
+      unit_system: metric
+      time_zone: UTC
+
+    # Enable Prometheus metrics endpoint
+    # Accessible at /api/prometheus
+    prometheus:
+
+    # MQTT integration for Zigbee2MQTT and other devices
+    mqtt:
+      broker: mosquitto.home-automation.svc.cluster.local
+      port: 1883
+
+    # Frontend
+    frontend:
+
+    # Logging
+    logger:
+      default: info

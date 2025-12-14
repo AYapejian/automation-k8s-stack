@@ -1,0 +1,15 @@
+# HomeAssistant Configuration Persistence
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homeassistant-config
+  namespace: home-automation
+  labels:
+    app.kubernetes.io/name: homeassistant
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi

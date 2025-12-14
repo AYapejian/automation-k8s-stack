@@ -1,4 +1,4 @@
-.PHONY: help cluster-up cluster-down cluster-status kubeconfig istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status loki-test tracing-up tracing-down tracing-status dashboards-test minio-up minio-down minio-status velero-up velero-down velero-status velero-test stack-up stack-down stack-status test lint clean
+.PHONY: help cluster-up cluster-down cluster-status kubeconfig istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status loki-test tracing-up tracing-down tracing-status dashboards-test minio-up minio-down minio-status velero-up velero-down velero-status velero-test home-automation-up home-automation-down home-automation-status home-automation-test stack-up stack-down stack-status test lint clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -265,6 +265,34 @@ velero-status: ## Show Velero status
 
 velero-test: ## Run Velero backup/restore integration test
 	@$(SCRIPTS_DIR)/velero-test.sh
+
+##@ Home Automation
+
+home-automation-up: ## Deploy Home Automation stack (HA, MQTT, Zigbee2MQTT, Homebridge)
+	@$(SCRIPTS_DIR)/home-automation-up.sh
+
+home-automation-down: ## Remove Home Automation stack (idempotent)
+	@$(SCRIPTS_DIR)/home-automation-down.sh --force
+
+home-automation-status: ## Show Home Automation stack status
+	@echo "Checking Home Automation status..."
+	@echo ""
+	@echo "Pods:"
+	@kubectl get pods -n home-automation 2>/dev/null || echo "  home-automation namespace not found"
+	@echo ""
+	@echo "Services:"
+	@kubectl get svc -n home-automation 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "PVCs:"
+	@kubectl get pvc -n home-automation 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Access URLs:"
+	@echo "  HomeAssistant:  https://homeassistant.localhost:8443"
+	@echo "  Zigbee2MQTT:    https://zigbee2mqtt.localhost:8443"
+	@echo "  Homebridge:     https://homebridge.localhost:8443"
+
+home-automation-test: ## Run Home Automation integration tests
+	@$(SCRIPTS_DIR)/home-automation-test.sh
 
 ##@ Stack Management
 

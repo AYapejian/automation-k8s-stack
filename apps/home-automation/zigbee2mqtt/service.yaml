@@ -1,0 +1,18 @@
+# Zigbee2MQTT Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: zigbee2mqtt
+  namespace: home-automation
+  labels:
+    app.kubernetes.io/name: zigbee2mqtt
+    app.kubernetes.io/component: zigbee-bridge
+spec:
+  selector:
+    app.kubernetes.io/name: zigbee2mqtt
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+  type: ClusterIP

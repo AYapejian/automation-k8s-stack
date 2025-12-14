@@ -1,0 +1,21 @@
+# VirtualService routes traffic from Gateway to Homebridge UI
+# Accessible at https://homebridge.localhost:8443
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: homebridge
+  namespace: home-automation
+spec:
+  hosts:
+    - "homebridge.localhost"
+  gateways:
+    - istio-ingress/main-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: homebridge.home-automation.svc.cluster.local
+            port:
+              number: 8581

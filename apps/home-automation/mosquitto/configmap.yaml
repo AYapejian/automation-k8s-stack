@@ -1,0 +1,35 @@
+# Mosquitto Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mosquitto-config
+  namespace: home-automation
+  labels:
+    app.kubernetes.io/name: mosquitto
+data:
+  mosquitto.conf: |
+    # Mosquitto MQTT Broker Configuration
+
+    # Listeners
+    listener 1883
+    listener 9001
+    protocol websockets
+
+    # Authentication (anonymous for k3d dev environment)
+    # In production, use password file or authentication plugin
+    allow_anonymous true
+
+    # Persistence
+    persistence true
+    persistence_location /mosquitto/data/
+
+    # Logging
+    log_dest stdout
+    log_type error
+    log_type warning
+    log_type notice
+    log_type information
+
+    # Connection settings
+    max_connections -1
+    max_keepalive 65535
