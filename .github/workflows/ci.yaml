@@ -34,7 +34,7 @@ jobs:
     name: Full Stack Integration
     runs-on: ubuntu-latest
     needs: lint
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -85,7 +85,7 @@ jobs:
       - name: Verify Minio
         run: |
           kubectl wait --for=condition=Ready pods -l release=minio -n minio --timeout=180s
-          sleep 20  # Wait for bucket creation
+          sleep 30  # Wait for bucket creation job to complete
           kubectl run minio-health \
             --image=curlimages/curl:latest \
             --restart=Never --rm -i --quiet \
