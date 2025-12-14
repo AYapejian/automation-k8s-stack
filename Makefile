@@ -1,4 +1,4 @@
-.PHONY: help cluster-up cluster-down cluster-status istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status test lint clean
+.PHONY: help cluster-up cluster-down cluster-status kubeconfig istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status stack-up stack-down stack-status test lint clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -15,6 +15,9 @@ help: ## Show this help message
 
 cluster-up: ## Create k3d cluster with local registry (idempotent)
 	@$(SCRIPTS_DIR)/cluster-up.sh
+
+kubeconfig: ## Print export command for kubectl context (use: eval $$(make kubeconfig))
+	@echo "export KUBECONFIG=$$(k3d kubeconfig write automation-k8s 2>/dev/null)"
 
 cluster-down: ## Destroy k3d cluster and registry (idempotent)
 	@$(SCRIPTS_DIR)/cluster-down.sh
@@ -179,6 +182,17 @@ loki-status: ## Show Loki + Promtail status
 	@kubectl get pods -n observability -l app.kubernetes.io/name=promtail 2>/dev/null || echo "  (none)"
 	@echo ""
 	@echo "Query logs in Grafana: https://grafana.localhost:8443 -> Explore -> Loki"
+
+##@ Stack Management
+
+stack-up: ## Deploy complete infrastructure stack (cluster + platform + observability)
+	@$(SCRIPTS_DIR)/stack-up.sh
+
+stack-down: ## Tear down complete infrastructure stack
+	@$(SCRIPTS_DIR)/stack-down.sh
+
+stack-status: ## Show overall stack health status
+	@$(SCRIPTS_DIR)/stack-status.sh
 
 ##@ Testing
 
