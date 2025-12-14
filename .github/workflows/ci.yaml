@@ -500,3 +500,109 @@ jobs:
           make cert-manager-down || true
           make istio-down || true
           make cluster-down
+
+  tracing-test:
+    name: Distributed Tracing Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install prerequisites
+        run: |
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          k3d version
+          helm version
+          jq --version
+
+      - name: Create k3d cluster
+        run: make cluster-up
+
+      - name: Install Istio
+        run: make istio-up
+
+      - name: Install cert-manager
+        run: make cert-manager-up
+
+      - name: Configure ingress
+        run: make ingress-up
+
+      - name: Install Minio (required for Tempo storage)
+        run: make minio-up
+
+      - name: Wait for Minio to be ready
+        run: |
+          echo "Waiting for Minio..."
+          kubectl wait --for=condition=Ready pods -l release=minio -n minio --timeout=180s
+          sleep 30
+
+      - name: Install Prometheus + Grafana
+        run: make prometheus-grafana-up
+
+      - name: Install tracing stack
+        run: make tracing-up
+
+      - name: Verify tracing components are ready
+        run: |
+          echo "Checking Tempo..."
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=tempo -n observability --timeout=180s
+          echo ""
+          echo "Checking OTel Collector..."
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=opentelemetry-collector -n observability --timeout=120s
+          echo ""
+          echo "Checking Jaeger..."
+          kubectl get pods -n observability -l app.kubernetes.io/name=jaeger
+
+      - name: Test Tempo health
+        run: |
+          echo "Testing Tempo health endpoint..."
+          kubectl run tempo-health-check \
+            --image=curlimages/curl:latest \
+            --restart=Never \
+            --rm -i --quiet \
+            --namespace observability \
+            -- curl -s "http://tempo.observability.svc.cluster.local:3200/ready"
+          echo "Tempo is ready!"
+
+      - name: Test OTel Collector health
+        run: |
+          echo "Testing OTel Collector health..."
+          kubectl run otel-health-check \
+            --image=curlimages/curl:latest \
+            --restart=Never \
+            --rm -i --quiet \
+            --namespace observability \
+            -- curl -s "http://otel-collector-opentelemetry-collector.observability.svc.cluster.local:13133"
+          echo "OTel Collector is healthy!"
+
+      - name: Generate test traces
+        run: |
+          echo "Deploying sample app and generating traces..."
+          make sample-app-up || true
+          sleep 10
+          for i in {1..5}; do
+            curl -sk -H "Host: httpbin.localhost" https://localhost:8443/headers || true
+            sleep 2
+          done
+          echo "Test traffic generated!"
+
+      - name: Test idempotency
+        run: |
+          echo "Running tracing-up again to verify idempotency..."
+          make tracing-up
+          echo "Idempotency test passed!"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          make sample-app-down || true
+          make tracing-down || true
+          make prometheus-grafana-down || true
+          make minio-down || true
+          make ingress-down || true
+          make cert-manager-down || true
+          make istio-down || true
+          make cluster-down

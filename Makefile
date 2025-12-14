@@ -1,4 +1,4 @@
-.PHONY: help cluster-up cluster-down cluster-status kubeconfig istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status loki-test minio-up minio-down minio-status stack-up stack-down stack-status test lint clean
+.PHONY: help cluster-up cluster-down cluster-status kubeconfig istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status loki-test tracing-up tracing-down tracing-status minio-up minio-down minio-status stack-up stack-down stack-status test lint clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -208,6 +208,31 @@ loki-status: ## Show Loki + Promtail status
 
 loki-test: ## Run Loki integration tests
 	@$(SCRIPTS_DIR)/loki-test.sh
+
+tracing-up: ## Install distributed tracing (OTel Collector, Jaeger, Tempo)
+	@$(SCRIPTS_DIR)/tracing-up.sh
+
+tracing-down: ## Uninstall distributed tracing (idempotent)
+	@$(SCRIPTS_DIR)/tracing-down.sh --force
+
+tracing-status: ## Show tracing stack status
+	@echo "Checking tracing stack status..."
+	@echo ""
+	@echo "Helm releases:"
+	@helm list -n observability 2>/dev/null | grep -E "otel-collector|jaeger|tempo" || echo "  (not installed)"
+	@echo ""
+	@echo "OTel Collector pods:"
+	@kubectl get pods -n observability -l app.kubernetes.io/name=opentelemetry-collector 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Jaeger pods:"
+	@kubectl get pods -n observability -l app.kubernetes.io/name=jaeger 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Tempo pods:"
+	@kubectl get pods -n observability -l app.kubernetes.io/name=tempo 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Access URLs:"
+	@echo "  Jaeger UI: https://jaeger.localhost:8443"
+	@echo "  Tempo (via Grafana): https://grafana.localhost:8443 -> Explore -> Tempo"
 
 ##@ Stack Management
 
