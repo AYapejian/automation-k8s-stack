@@ -1,0 +1,56 @@
+# Scheduled backup configuration
+# For k3d development, this creates periodic backups of key namespaces
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily-backup
+  namespace: velero
+spec:
+  # Run daily at 2 AM
+  schedule: "0 2 * * *"
+  template:
+    # Include all namespaces except system ones
+    includedNamespaces:
+      - '*'
+    excludedNamespaces:
+      - kube-system
+      - kube-public
+      - kube-node-lease
+      - velero
+    # Include all resources
+    includedResources:
+      - '*'
+    # Exclude secrets by default for safety
+    excludedResources:
+      - events
+      - events.events.k8s.io
+    # Label selector (optional, empty means all)
+    labelSelector: {}
+    # Storage location
+    storageLocation: default
+    # TTL - keep backups for 7 days in k3d
+    ttl: 168h0m0s
+    # Include cluster resources
+    includeClusterResources: true
+    # Default volume backup with restic
+    defaultVolumesToRestic: false
+---
+# On-demand backup template
+# Use: velero backup create <name> --from-schedule=daily-backup
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: default
+  namespace: velero
+spec:
+  provider: aws
+  objectStorage:
+    bucket: velero
+  config:
+    region: minio
+    s3ForcePathStyle: "true"
+    s3Url: http://minio.minio.svc.cluster.local:9000
+    publicUrl: http://minio.minio.svc.cluster.local:9000
+  credential:
+    name: velero-minio-credentials
+    key: cloud

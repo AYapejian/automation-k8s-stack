@@ -1,4 +1,4 @@
-.PHONY: help cluster-up cluster-down cluster-status kubeconfig istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status loki-test tracing-up tracing-down tracing-status dashboards-test minio-up minio-down minio-status stack-up stack-down stack-status test lint clean
+.PHONY: help cluster-up cluster-down cluster-status kubeconfig istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status loki-test tracing-up tracing-down tracing-status dashboards-test minio-up minio-down minio-status velero-up velero-down velero-status velero-test stack-up stack-down stack-status test lint clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -236,6 +236,35 @@ tracing-status: ## Show tracing stack status
 
 dashboards-test: ## Run dashboards and alerting tests
 	@$(SCRIPTS_DIR)/dashboards-test.sh
+
+##@ Backups
+
+velero-up: ## Install Velero backup system (idempotent, requires minio)
+	@$(SCRIPTS_DIR)/velero-up.sh
+
+velero-down: ## Uninstall Velero (idempotent)
+	@$(SCRIPTS_DIR)/velero-down.sh --force
+
+velero-status: ## Show Velero status
+	@echo "Checking Velero status..."
+	@echo ""
+	@echo "Helm release:"
+	@helm list -n velero 2>/dev/null || echo "  (not installed)"
+	@echo ""
+	@echo "Pods:"
+	@kubectl get pods -n velero 2>/dev/null || echo "  velero namespace not found"
+	@echo ""
+	@echo "Backup storage locations:"
+	@kubectl get backupstoragelocation -n velero 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Scheduled backups:"
+	@kubectl get schedules.velero.io -n velero 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Recent backups:"
+	@kubectl get backups.velero.io -n velero 2>/dev/null || echo "  (none)"
+
+velero-test: ## Run Velero backup/restore integration test
+	@$(SCRIPTS_DIR)/velero-test.sh
 
 ##@ Stack Management
 
