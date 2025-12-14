@@ -86,6 +86,17 @@ release_exists() {
     helm status "${release_name}" -n "${namespace}" >/dev/null 2>&1
 }
 
+# Get Helm upgrade flags based on version
+# Helm v4+ uses server-side apply by default which can cause field ownership conflicts
+# --force-conflicts resolves these but only exists in Helm v4+
+get_upgrade_flags() {
+    local helm_major_version
+    helm_major_version=$(helm version --short 2>/dev/null | grep -oE 'v[0-9]+' | head -1 | cut -c2-)
+    if [[ -n "${helm_major_version}" ]] && [[ "${helm_major_version}" -ge 4 ]]; then
+        echo "--force-conflicts"
+    fi
+}
+
 # Install or upgrade istio-base (CRDs)
 install_base() {
     log_info "Installing Istio base (CRDs)..."
@@ -96,7 +107,7 @@ install_base() {
             -n "${ISTIO_NAMESPACE}" \
             --version "${ISTIO_VERSION}" \
             -f "${ISTIO_DIR}/base/values.yaml" \
-            --force-conflicts \
+            $(get_upgrade_flags) \
             --wait
     else
         helm install istio-base istio/base \
@@ -118,7 +129,7 @@ install_istiod() {
             -n "${ISTIO_NAMESPACE}" \
             --version "${ISTIO_VERSION}" \
             -f "${ISTIO_DIR}/istiod/values.yaml" \
-            --force-conflicts \
+            $(get_upgrade_flags) \
             --wait --timeout 5m
     else
         helm install istiod istio/istiod \
@@ -154,7 +165,7 @@ install_gateway() {
             -n "${ISTIO_INGRESS_NAMESPACE}" \
             --version "${ISTIO_VERSION}" \
             --skip-schema-validation \
-            --force-conflicts \
+            $(get_upgrade_flags) \
             --wait --timeout 5m
     else
         helm install istio-ingress istio/gateway \
