@@ -54,6 +54,14 @@ check_prerequisites() {
         log_error "Namespace ${NAMESPACE} not found. Run 'make prometheus-grafana-up' first."
         exit 1
     fi
+
+    # Check if Minio is running (required for S3 storage)
+    if ! kubectl get pods -n minio -l app.kubernetes.io/name=minio -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; then
+        log_error "Minio is not running. Run 'make minio-up' first."
+        log_error "Loki requires Minio for S3-compatible log storage."
+        exit 1
+    fi
+    log_info "Minio is running - S3 storage available"
 }
 
 # Add Grafana Helm repository
@@ -91,6 +99,12 @@ install_loki_stack() {
             -f "${LOKI_DIR}/values.yaml" \
             --wait --timeout 5m
     fi
+}
+
+# Apply Minio credentials secret for S3 access
+apply_minio_credentials() {
+    log_info "Applying Minio credentials for Loki..."
+    kubectl apply -f "${LOKI_DIR}/resources/minio-credentials.yaml"
 }
 
 # Apply Grafana datasource
@@ -138,6 +152,8 @@ print_info() {
     log_info "Loki + Promtail installed successfully!"
     log_info "=========================================="
     echo ""
+    echo "Storage: Minio S3 (bucket: loki-chunks)"
+    echo ""
     echo "Helm release:"
     helm list -n "${NAMESPACE}" | grep loki
     echo ""
@@ -151,6 +167,7 @@ print_info() {
     echo "  2. Go to Explore (compass icon)"
     echo "  3. Select 'Loki' datasource"
     echo "  4. Try: {namespace=\"kube-system\"}"
+    echo "  5. For Istio proxy logs: {container=\"istio-proxy\"}"
     echo ""
     echo "Useful commands:"
     echo "  make loki-status  # Check status"
@@ -164,6 +181,7 @@ main() {
     setup_kubeconfig
     check_prerequisites
     setup_helm_repo
+    apply_minio_credentials
     install_loki_stack
     apply_datasource
     verify_installation

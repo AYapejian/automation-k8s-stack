@@ -2,6 +2,7 @@
 # https://github.com/grafana/helm-charts/tree/main/charts/loki-stack
 #
 # Bundled Loki + Promtail for simple local development.
+# Storage: Minio S3-compatible object storage
 
 # Loki configuration
 loki:
@@ -17,9 +18,14 @@ loki:
       cpu: 200m
       memory: 256Mi
 
-  # Persistence - disabled for k3d (ephemeral)
+  # Persistence - disabled (using Minio for storage)
   persistence:
     enabled: false
+
+  # Environment variables for S3 credentials (from secret)
+  extraEnvFrom:
+    - secretRef:
+        name: loki-minio-credentials
 
   # Loki config overrides
   config:
@@ -45,7 +51,7 @@ loki:
       configs:
         - from: 2020-10-24
           store: boltdb-shipper
-          object_store: filesystem
+          object_store: s3
           schema: v11
           index:
             prefix: index_
@@ -56,13 +62,14 @@ loki:
         active_index_directory: /data/loki/boltdb-shipper-active
         cache_location: /data/loki/boltdb-shipper-cache
         cache_ttl: 24h
-        shared_store: filesystem
-      filesystem:
-        directory: /data/loki/chunks
+        shared_store: s3
+      aws:
+        s3: http://${MINIO_ACCESS_KEY}:${MINIO_SECRET_KEY}@minio.minio.svc.cluster.local:9000/loki-chunks
+        s3forcepathstyle: true
 
     compactor:
       working_directory: /data/loki/boltdb-shipper-compactor
-      shared_store: filesystem
+      shared_store: s3
 
     table_manager:
       retention_deletes_enabled: true
