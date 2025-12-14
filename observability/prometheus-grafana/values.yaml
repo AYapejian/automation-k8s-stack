@@ -2,11 +2,22 @@
 # https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack
 #
 # Optimized for local development with reduced resource requirements.
-# Alertmanager disabled (enabled in Phase 3.4).
 
-# Disable alertmanager for now (Phase 3.4 adds alerting)
+# Alertmanager configuration
 alertmanager:
-  enabled: false
+  enabled: true
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+    # Short retention for k3d
+    retention: 24h
+    # No persistent storage for k3d
+    storage: {}
 
 # Grafana configuration
 grafana:

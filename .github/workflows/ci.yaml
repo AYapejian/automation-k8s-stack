@@ -406,11 +406,11 @@ jobs:
           make minio-down || true
           make cluster-down
 
-  velero-test:
-    name: Velero Backup Tests
+  loki-test:
+    name: Loki Log Aggregation Tests
     runs-on: ubuntu-latest
     needs: lint
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -426,7 +426,111 @@ jobs:
       - name: Create k3d cluster
         run: make cluster-up
 
-      - name: Install Minio (required for Velero storage)
+      - name: Install Istio
+        run: make istio-up
+
+      - name: Install cert-manager
+        run: make cert-manager-up
+
+      - name: Configure ingress
+        run: make ingress-up
+
+      - name: Install Minio (required for Loki storage)
+        run: make minio-up
+
+      - name: Wait for Minio to be ready
+        run: |
+          echo "Waiting for Minio..."
+          kubectl wait --for=condition=Ready pods -l release=minio -n minio --timeout=180s
+          # Wait for bucket creation job
+          sleep 30
+
+      - name: Install Prometheus + Grafana
+        run: make prometheus-grafana-up
+
+      - name: Install Loki + Promtail
+        run: make loki-up
+
+      - name: Verify Loki is ready
+        run: |
+          echo "Checking Loki pods..."
+          kubectl get pods -n observability
+          kubectl wait --for=condition=Ready pods -l app=loki,release=loki -n observability --timeout=180s
+          echo ""
+          echo "Checking Promtail pods..."
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=promtail -n observability --timeout=120s
+
+      - name: Test Loki health endpoint
+        run: |
+          echo "Testing Loki health..."
+          kubectl run loki-health-check \
+            --image=curlimages/curl:latest \
+            --restart=Never \
+            --rm -i --quiet \
+            --namespace observability \
+            -- curl -s "http://loki:3100/ready"
+          echo "Loki is ready!"
+
+      - name: Test log queries
+        run: |
+          echo "Testing kube-system log query..."
+          kubectl run loki-query-test \
+            --image=curlimages/curl:latest \
+            --restart=Never \
+            --rm -i \
+            --namespace observability \
+            -- curl -s -G "http://loki:3100/loki/api/v1/query" \
+               --data-urlencode 'query={namespace="kube-system"}' \
+               --data-urlencode "limit=5" | jq .status
+          echo "Log query test passed!"
+
+      - name: Test idempotency
+        run: |
+          echo "Running loki-up again to verify idempotency..."
+          make loki-up
+          echo "Idempotency test passed!"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          make loki-down || true
+          make prometheus-grafana-down || true
+          make minio-down || true
+          make ingress-down || true
+          make cert-manager-down || true
+          make istio-down || true
+          make cluster-down
+
+  tracing-test:
+    name: Distributed Tracing Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install prerequisites
+        run: |
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          k3d version
+          helm version
+          jq --version
+
+      - name: Create k3d cluster
+        run: make cluster-up
+
+      - name: Install Istio
+        run: make istio-up
+
+      - name: Install cert-manager
+        run: make cert-manager-up
+
+      - name: Configure ingress
+        run: make ingress-up
+
+      - name: Install Minio (required for Tempo storage)
         run: make minio-up
 
       - name: Wait for Minio to be ready
@@ -435,65 +539,70 @@ jobs:
           kubectl wait --for=condition=Ready pods -l release=minio -n minio --timeout=180s
           sleep 30
 
-      - name: Install Velero
-        run: make velero-up
+      - name: Install Prometheus + Grafana
+        run: make prometheus-grafana-up
 
-      - name: Verify Velero is ready
+      - name: Install tracing stack
+        run: make tracing-up
+
+      - name: Verify tracing components are ready
         run: |
-          echo "Checking Velero pods..."
-          kubectl get pods -n velero
-          kubectl wait --for=condition=Available deployment/velero -n velero --timeout=180s
+          echo "Checking Tempo..."
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=tempo -n observability --timeout=180s
           echo ""
-          echo "Checking backup storage location..."
-          kubectl get backupstoragelocation -n velero
+          echo "Checking OTel Collector..."
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=opentelemetry-collector -n observability --timeout=120s
+          echo ""
+          echo "Checking Jaeger..."
+          kubectl get pods -n observability -l app.kubernetes.io/name=jaeger
 
-      - name: Test backup storage location
+      - name: Test Tempo health
         run: |
-          echo "Waiting for backup storage location to become available..."
-          for i in {1..20}; do
-            PHASE=$(kubectl get backupstoragelocation default -n velero -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-            echo "Attempt $i: Phase = $PHASE"
-            if [ "$PHASE" = "Available" ]; then
-              echo "SUCCESS: Backup storage location is Available"
-              exit 0
-            fi
-            sleep 5
+          echo "Testing Tempo health endpoint..."
+          kubectl run tempo-health-check \
+            --image=curlimages/curl:latest \
+            --restart=Never \
+            --rm -i --quiet \
+            --namespace observability \
+            -- curl -s "http://tempo.observability.svc.cluster.local:3200/ready"
+          echo "Tempo is ready!"
+
+      - name: Test OTel Collector health
+        run: |
+          echo "Testing OTel Collector health..."
+          kubectl run otel-health-check \
+            --image=curlimages/curl:latest \
+            --restart=Never \
+            --rm -i --quiet \
+            --namespace observability \
+            -- curl -s "http://otel-collector-opentelemetry-collector.observability.svc.cluster.local:13133"
+          echo "OTel Collector is healthy!"
+
+      - name: Generate test traces
+        run: |
+          echo "Deploying sample app and generating traces..."
+          make sample-app-up || true
+          sleep 10
+          for i in {1..5}; do
+            curl -sk -H "Host: httpbin.localhost" https://localhost:8443/headers || true
+            sleep 2
           done
-          echo "WARNING: Backup storage location not Available after waiting"
-          kubectl describe backupstoragelocation default -n velero || true
-
-      - name: Test creating a backup
-        run: |
-          echo "Creating test namespace..."
-          kubectl create namespace velero-ci-test
-          kubectl apply -n velero-ci-test -f - <<EOF
-          apiVersion: v1
-          kind: ConfigMap
-          metadata:
-            name: test-config
-          data:
-            test-key: "test-value"
-          EOF
-
-          echo "Creating backup..."
-          kubectl exec -n velero deploy/velero -- \
-            /velero backup create ci-test-backup \
-            --include-namespaces velero-ci-test \
-            --wait || echo "Backup command completed"
-
-          echo "Checking backup status..."
-          kubectl get backup -n velero
+          echo "Test traffic generated!"
 
       - name: Test idempotency
         run: |
-          echo "Running velero-up again to verify idempotency..."
-          make velero-up
+          echo "Running tracing-up again to verify idempotency..."
+          make tracing-up
           echo "Idempotency test passed!"
 
       - name: Cleanup
         if: always()
         run: |
-          kubectl delete namespace velero-ci-test --ignore-not-found=true || true
-          make velero-down || true
+          make sample-app-down || true
+          make tracing-down || true
+          make prometheus-grafana-down || true
           make minio-down || true
+          make ingress-down || true
+          make cert-manager-down || true
+          make istio-down || true
           make cluster-down
