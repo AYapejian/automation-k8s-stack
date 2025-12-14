@@ -1,0 +1,82 @@
+# Jaeger Helm values for k3d
+# Chart: jaegertracing/jaeger
+# Docs: https://www.jaegertracing.io/docs/
+
+# Use all-in-one mode for k3d (simple, single-pod deployment)
+allInOne:
+  enabled: true
+  replicas: 1
+  image:
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Disable separate components (using all-in-one)
+collector:
+  enabled: false
+query:
+  enabled: false
+agent:
+  enabled: false
+
+# Disable data stores (using in-memory)
+provisionDataStore:
+  cassandra: false
+  elasticsearch: false
+  kafka: false
+
+# Storage configuration - use memory for k3d
+storage:
+  type: memory
+
+# Jaeger v2 (OTel-based) configuration
+config:
+  service:
+    extensions: [jaeger_storage, jaeger_query, healthcheckv2]
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [batch]
+        exporters: [jaeger_storage_exporter]
+
+  extensions:
+    healthcheckv2:
+      use_v2: true
+      http:
+        endpoint: 0.0.0.0:13133
+
+    jaeger_query:
+      storage:
+        traces: memory_store
+
+    jaeger_storage:
+      backends:
+        memory_store:
+          memory:
+            max_traces: 50000
+
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+  processors:
+    batch:
+      timeout: 1s
+      send_batch_size: 1024
+
+  exporters:
+    jaeger_storage_exporter:
+      trace_storage: memory_store
+
+# Service for query UI
+service:
+  type: ClusterIP

@@ -1,8 +1,7 @@
 # Mesh-wide telemetry configuration
 # https://istio.io/latest/docs/tasks/observability/telemetry/
 #
-# Configures access logging and metrics collection.
-# Tracing is prepared but commented out until OTel Collector is deployed (Phase 3.3).
+# Configures access logging, metrics, and tracing.
 apiVersion: telemetry.istio.io/v1
 kind: Telemetry
 metadata:
@@ -26,8 +25,8 @@ spec:
               operation: UPSERT
               value: request.protocol
 
-  # Tracing configuration (uncomment when OTel Collector is deployed in Phase 3.3)
-  # tracing:
-  #   - providers:
-  #       - name: otel-tracing
-  #     randomSamplingPercentage: 100.0
+  # Tracing configuration (sends to OTel Collector -> Jaeger + Tempo)
+  tracing:
+    - providers:
+        - name: otel-tracing
+      randomSamplingPercentage: 100.0
