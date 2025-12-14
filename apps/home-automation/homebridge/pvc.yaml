@@ -1,0 +1,15 @@
+# Homebridge Configuration Persistence
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homebridge-config
+  namespace: home-automation
+  labels:
+    app.kubernetes.io/name: homebridge
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi

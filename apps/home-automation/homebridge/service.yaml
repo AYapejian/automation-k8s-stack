@@ -1,0 +1,22 @@
+# Homebridge Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: homebridge
+  namespace: home-automation
+  labels:
+    app.kubernetes.io/name: homebridge
+    app.kubernetes.io/component: homekit-bridge
+spec:
+  selector:
+    app.kubernetes.io/name: homebridge
+  ports:
+    - name: http
+      port: 8581
+      targetPort: http
+      protocol: TCP
+    - name: homekit
+      port: 51826
+      targetPort: homekit
+      protocol: TCP
+  type: ClusterIP

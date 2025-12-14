@@ -1,0 +1,61 @@
+# Zigbee2MQTT Configuration
+# k3d: Uses 'null' adapter (no hardware)
+# k3s: Override with USB device path
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zigbee2mqtt-config
+  namespace: home-automation
+  labels:
+    app.kubernetes.io/name: zigbee2mqtt
+data:
+  configuration.yaml: |
+    # Zigbee2MQTT Configuration
+    # Documentation: https://www.zigbee2mqtt.io/guide/configuration/
+
+    # MQTT broker connection
+    mqtt:
+      base_topic: zigbee2mqtt
+      server: mqtt://mosquitto.home-automation.svc.cluster.local:1883
+      # For authenticated MQTT, uncomment:
+      # user: zigbee2mqtt
+      # password: YOUR_PASSWORD
+
+    # Serial port configuration
+    serial:
+      # k3d: No hardware, use null adapter for testing
+      # In k3s production, override with: port: /dev/ttyUSB0
+      adapter: ezsp
+      port: tcp://localhost:8888
+
+    # Web frontend
+    frontend:
+      port: 8080
+      host: 0.0.0.0
+
+    # HomeAssistant integration
+    homeassistant: true
+
+    # Device options
+    advanced:
+      # Logging
+      log_level: info
+      log_output:
+        - console
+
+      # Network key (generate unique key for production)
+      network_key: GENERATE
+
+      # Last seen
+      last_seen: ISO_8601
+
+      # Availability
+      availability_timeout: 0
+
+    # Device configuration
+    device_options:
+      legacy: false
+
+    # Experimental features
+    experimental:
+      new_api: true

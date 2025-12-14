@@ -15,11 +15,13 @@ on:
       - 'observability/**'
       - 'platform/minio/**'
       - 'platform/velero/**'
+      - 'apps/home-automation/**'
       - 'scripts/prometheus-*.sh'
       - 'scripts/loki-*.sh'
       - 'scripts/tracing-*.sh'
       - 'scripts/minio-*.sh'
       - 'scripts/velero-*.sh'
+      - 'scripts/home-automation-*.sh'
 
 jobs:
   lint:
@@ -134,6 +136,32 @@ jobs:
           kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=grafana -n observability --timeout=180s || true
           kubectl get pods -n observability
 
+      # ===== HOME AUTOMATION STACK =====
+      - name: Install Home Automation stack
+        run: make home-automation-up
+
+      - name: Verify Home Automation components
+        run: |
+          echo "Waiting for Mosquitto MQTT..."
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=mosquitto -n home-automation --timeout=120s
+          echo "Waiting for HomeAssistant..."
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=homeassistant -n home-automation --timeout=180s || true
+          echo "Waiting for Zigbee2MQTT..."
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=zigbee2mqtt -n home-automation --timeout=120s || true
+          echo "Waiting for Homebridge..."
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=homebridge -n home-automation --timeout=120s || true
+          kubectl get pods -n home-automation
+
+      - name: Test MQTT connectivity
+        run: |
+          echo "Testing MQTT broker connectivity..."
+          kubectl run mqtt-test \
+            --image=eclipse-mosquitto:2.0.18 \
+            --restart=Never --rm -i --quiet \
+            --namespace home-automation \
+            -- mosquitto_pub -h mosquitto -p 1883 -t "ci/test" -m "hello" -q 1
+          echo "MQTT connectivity verified"
+
       # ===== IDEMPOTENCY TESTS =====
       - name: Test idempotency (core components)
         run: |
@@ -143,6 +171,7 @@ jobs:
           make ingress-up
           make minio-up
           make prometheus-grafana-up
+          make home-automation-up
           echo "Core components idempotent!"
 
       # ===== SUMMARY =====
@@ -158,6 +187,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
+          make home-automation-down || true
           make sample-app-down || true
           make prometheus-grafana-down || true
           make minio-down || true

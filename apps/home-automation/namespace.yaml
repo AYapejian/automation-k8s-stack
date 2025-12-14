@@ -1,0 +1,9 @@
+# Home Automation namespace with Istio sidecar injection
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: home-automation
+  labels:
+    istio-injection: enabled
+    app.kubernetes.io/name: home-automation
+    app.kubernetes.io/component: applications
