@@ -91,13 +91,13 @@ install_loki_stack() {
             -n "${NAMESPACE}" \
             --version "${LOKI_STACK_VERSION}" \
             -f "${LOKI_DIR}/values.yaml" \
-            --wait --timeout 10m
+            --wait --timeout 15m
     else
         helm install loki grafana/loki-stack \
             -n "${NAMESPACE}" \
             --version "${LOKI_STACK_VERSION}" \
             -f "${LOKI_DIR}/values.yaml" \
-            --wait --timeout 10m
+            --wait --timeout 15m
     fi
 }
 
