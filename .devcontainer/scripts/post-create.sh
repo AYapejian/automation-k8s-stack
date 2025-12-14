@@ -120,11 +120,13 @@ echo "  Registry:   registry.localhost:5111"
 echo ""
 
 # =============================================================================
-# API Key Check
+# Claude Authentication Check
 # =============================================================================
-if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-    echo "NOTE: ANTHROPIC_API_KEY not set."
-    echo "      Set it in your host shell profile and rebuild container,"
-    echo "      or run: export ANTHROPIC_API_KEY='sk-ant-...'"
+if [ -f ~/.claude/.credentials.json ]; then
+    echo "Claude Code: Authenticated (credentials shared from host)"
+else
+    echo "NOTE: Claude Code not authenticated."
+    echo "      Run 'claude login' on your HOST machine, then rebuild container."
+    echo "      Your ~/.claude directory is bind-mounted for credential sharing."
     echo ""
 fi

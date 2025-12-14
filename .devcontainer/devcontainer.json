@@ -40,13 +40,15 @@
   // Volume Mounts
   // =============================================================================
   // TEMPLATE: Change volume name prefixes for different projects
+  // NOTE: ~/.claude uses bind mount to share Claude Max OAuth credentials with host
   "mounts": [
     // Docker socket for k3d access
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
     // Persist kubeconfig across container rebuilds
     "source=automation-k8s-kube,target=/home/vscode/.kube,type=volume",
-    // Persist Claude Code config and auth across container rebuilds
-    "source=automation-k8s-claude,target=/home/vscode/.claude,type=volume",
+    // Share Claude Code config with host - enables Claude Max OAuth persistence
+    // Uses bind mount so host's claude login works in container (no re-auth needed)
+    "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind",
     // Persist shell history
     "source=automation-k8s-history,target=/home/vscode/.bash_history_dir,type=volume"
   ],
@@ -66,12 +68,16 @@
   "containerEnv": {
     // Explicit Docker socket path
     "DOCKER_HOST": "unix:///var/run/docker.sock",
-    // Inject Anthropic API key from host environment
-    // Set this in your shell profile: export ANTHROPIC_API_KEY="sk-ant-..."
-    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}",
     // Optional: GitHub token for gh CLI (alternatively use 'gh auth login')
     "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"
+    // NOTE: Claude Max users don't need ANTHROPIC_API_KEY - OAuth credentials
+    // are shared via the ~/.claude bind mount above
   },
+
+  // =============================================================================
+  // Init Command - ensure host directories exist before mounting
+  // =============================================================================
+  "initializeCommand": "mkdir -p ~/.claude",
 
   // =============================================================================
   // Lifecycle Scripts

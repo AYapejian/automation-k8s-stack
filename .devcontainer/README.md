@@ -7,7 +7,7 @@ This devcontainer provides a secure, isolated environment for using Claude Code 
 1. **Prerequisites**
    - [Docker Desktop](https://www.docker.com/products/docker-desktop/) running
    - [VS Code](https://code.visualstudio.com/) with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-   - `ANTHROPIC_API_KEY` set in your shell profile
+   - Claude Code authenticated on your host (`claude login` if not already)
 
 2. **Open in Container**
    - Open this project in VS Code
@@ -23,6 +23,8 @@ This devcontainer provides a secure, isolated environment for using Claude Code 
    # Use Claude Code with full permissions (safe in container)
    claude --dangerously-skip-permissions
    ```
+
+**Claude Max users:** Your OAuth credentials are automatically shared from your host's `~/.claude` directory - no re-authentication needed!
 
 ## What's Included
 
@@ -55,25 +57,37 @@ This design allows safe use of `--dangerously-skip-permissions` because:
 
 ## Persistent Data
 
-The following data persists across container rebuilds (stored in Docker volumes):
+The following data persists across container rebuilds:
 
-| Volume | Path | Contents |
-|--------|------|----------|
-| `automation-k8s-kube` | `~/.kube` | Kubernetes configs |
-| `automation-k8s-claude` | `~/.claude` | Claude Code config & auth |
-| `automation-k8s-history` | `~/.bash_history_dir` | Shell history |
+| Mount | Path | Type | Contents |
+|-------|------|------|----------|
+| `automation-k8s-kube` | `~/.kube` | Volume | Kubernetes configs |
+| Host `~/.claude` | `~/.claude` | Bind | Claude OAuth credentials (shared with host) |
+| `automation-k8s-history` | `~/.bash_history_dir` | Volume | Shell history |
 
-## Secrets Management
+## Authentication
 
-### ANTHROPIC_API_KEY
+### Claude Max / Claude Pro (OAuth - Recommended)
 
-Set in your **host** shell profile (`~/.zshrc` or `~/.bashrc`):
+Your Claude credentials are **automatically shared** from your host machine:
 
 ```bash
+# On host (one-time setup)
+claude login
+```
+
+The devcontainer bind-mounts `~/.claude` from your host, so your OAuth session persists across container rebuilds. No re-authentication needed!
+
+### API Key Users
+
+If using an API key instead of Claude Max:
+
+```bash
+# Inside container
 export ANTHROPIC_API_KEY="sk-ant-api03-..."
 ```
 
-The devcontainer automatically injects this via `${localEnv:ANTHROPIC_API_KEY}`.
+Or add to `.bashrc` inside the container for persistence.
 
 ### GitHub Token
 
@@ -84,7 +98,7 @@ Two options:
    gh auth login
    ```
 
-2. **Environment variable** (set on host):
+2. **Environment variable** (set on host, auto-injected):
    ```bash
    export GITHUB_TOKEN="ghp_..."
    ```
@@ -94,7 +108,7 @@ Two options:
 Automatically managed by k3d:
 - Generated when cluster is created
 - Merged on container start if cluster exists
-- Stored in persistent volume
+- Stored in persistent Docker volume
 
 ## Common Commands
 
