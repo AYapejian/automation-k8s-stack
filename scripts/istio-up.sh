@@ -96,7 +96,7 @@ install_base() {
             -n "${ISTIO_NAMESPACE}" \
             --version "${ISTIO_VERSION}" \
             -f "${ISTIO_DIR}/base/values.yaml" \
-            --force \
+            --force-conflicts \
             --wait
     else
         helm install istio-base istio/base \
@@ -118,7 +118,7 @@ install_istiod() {
             -n "${ISTIO_NAMESPACE}" \
             --version "${ISTIO_VERSION}" \
             -f "${ISTIO_DIR}/istiod/values.yaml" \
-            --force \
+            --force-conflicts \
             --wait --timeout 5m
     else
         helm install istiod istio/istiod \
@@ -154,7 +154,7 @@ install_gateway() {
             -n "${ISTIO_INGRESS_NAMESPACE}" \
             --version "${ISTIO_VERSION}" \
             --skip-schema-validation \
-            --force \
+            --force-conflicts \
             --wait --timeout 5m
     else
         helm install istio-ingress istio/gateway \
