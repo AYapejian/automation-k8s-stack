@@ -1,4 +1,4 @@
-.PHONY: help cluster-up cluster-down cluster-status kubeconfig istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status minio-up minio-down minio-status stack-up stack-down stack-status test lint clean
+.PHONY: help cluster-up cluster-down cluster-status kubeconfig istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status loki-test minio-up minio-down minio-status stack-up stack-down stack-status test lint clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -205,6 +205,9 @@ loki-status: ## Show Loki + Promtail status
 	@kubectl get pods -n observability -l app.kubernetes.io/name=promtail 2>/dev/null || echo "  (none)"
 	@echo ""
 	@echo "Query logs in Grafana: https://grafana.localhost:8443 -> Explore -> Loki"
+
+loki-test: ## Run Loki integration tests
+	@$(SCRIPTS_DIR)/loki-test.sh
 
 ##@ Stack Management
 

@@ -20,10 +20,10 @@ This directory contains the Loki and Promtail configuration for log aggregation 
 │         └────────────────┼────────────────┘                  │
 │                          │                                   │
 │                          ▼                                   │
-│                    ┌───────────┐                             │
-│                    │   Loki    │                             │
-│                    │ (storage) │                             │
-│                    └─────┬─────┘                             │
+│                    ┌───────────┐      ┌───────────┐         │
+│                    │   Loki    │──────│   Minio   │         │
+│                    │ (query)   │      │  (S3 API) │         │
+│                    └─────┬─────┘      └───────────┘         │
 │                          │                                   │
 └──────────────────────────┼───────────────────────────────────┘
                            │
@@ -37,6 +37,7 @@ This directory contains the Loki and Promtail configuration for log aggregation 
 ## Prerequisites
 
 - Running k3d cluster (`make cluster-up`)
+- Minio object storage (`make minio-up`)
 - Prometheus + Grafana installed (`make prometheus-grafana-up`)
 
 ## Installation
@@ -59,18 +60,20 @@ observability/loki/
 ├── README.md                       # This file
 ├── values.yaml                     # Loki-stack Helm values (Loki + Promtail)
 └── resources/
-    └── grafana-datasource.yaml     # Loki datasource for Grafana
+    ├── grafana-datasource.yaml     # Loki datasource for Grafana
+    └── minio-credentials.yaml      # Minio credentials for S3 storage
 ```
 
 ## Configuration
 
-### k3d Optimizations
+### k3d Configuration
 
 | Setting | Value | Reason |
 |---------|-------|--------|
 | Deployment mode | SingleBinary | Simple for local dev |
 | Retention | 24h | Short retention for local dev |
-| Storage | Filesystem | No object storage needed |
+| Storage | Minio S3 | Full integration testing |
+| Bucket | loki-chunks | S3-compatible storage |
 | Auth | Disabled | Local dev only |
 
 ### Log Collection
@@ -167,29 +170,31 @@ curl http://localhost:3101/targets
    kubectl logs -n observability -l app.kubernetes.io/name=grafana -c grafana-sc-datasources
    ```
 
+## Minio Storage
+
+Loki is configured to use Minio for S3-compatible storage:
+
+- **Bucket**: `loki-chunks`
+- **Endpoint**: `minio.minio.svc.cluster.local:9000`
+- **Credentials**: Stored in `loki-minio-credentials` secret
+
+To verify storage is working:
+```bash
+# Check if objects exist in the bucket
+kubectl run minio-ls --rm -i --image=minio/mc:latest \
+  --env="MC_HOST_myminio=http://minioadmin:minioadmin123@minio.minio.svc.cluster.local:9000" \
+  -- mc ls myminio/loki-chunks/
+```
+
 ## Production Considerations
 
 For production (k3s), consider:
 
-- **Object Storage**: Use S3/Minio for chunk storage
 - **Distributed Mode**: Use read/write/backend separation
 - **Retention**: Increase to 7-30 days
 - **Resources**: Increase CPU/memory limits
 - **Compaction**: Enable chunk compaction
-
-Example production config:
-```yaml
-deploymentMode: Distributed
-
-loki:
-  storage:
-    type: s3
-    s3:
-      endpoint: minio.storage.svc:9000
-      bucketnames: loki-chunks
-      access_key_id: ${MINIO_ACCESS_KEY}
-      secret_access_key: ${MINIO_SECRET_KEY}
-```
+- **Sealed Secrets**: Convert credentials to SealedSecrets
 
 ## Versions
 
