@@ -7,6 +7,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ISTIO_DIR="${REPO_ROOT}/platform/istio"
 ISTIO_NAMESPACE="istio-system"
 ISTIO_INGRESS_NAMESPACE="istio-ingress"
+CLUSTER_NAME="automation-k8s"
 
 # Colors for output
 RED='\033[0;31m'
@@ -17,6 +18,18 @@ NC='\033[0m' # No Color
 log_info() { echo -e "${GREEN}[INFO]${NC} $*"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
+
+# Setup kubeconfig for k3d cluster
+# This handles environments with complex KUBECONFIG env vars
+setup_kubeconfig() {
+    if command -v k3d >/dev/null 2>&1; then
+        local kubeconfig
+        kubeconfig=$(k3d kubeconfig write "${CLUSTER_NAME}" 2>/dev/null) || true
+        if [[ -n "${kubeconfig}" && -f "${kubeconfig}" ]]; then
+            export KUBECONFIG="${kubeconfig}"
+        fi
+    fi
+}
 
 # Parse arguments
 FORCE=false
@@ -139,6 +152,7 @@ cleanup() {
 main() {
     log_info "Starting Istio uninstallation..."
 
+    setup_kubeconfig
     check_prerequisites
 
     # Check if cluster is accessible

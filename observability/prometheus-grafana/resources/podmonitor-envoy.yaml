@@ -1,0 +1,49 @@
+# PodMonitor for Envoy sidecar proxies
+# Scrapes metrics from istio-proxy containers across all namespaces
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: envoy-stats-monitor
+  namespace: observability
+  labels:
+    monitoring: istio-proxies
+    app.kubernetes.io/part-of: kube-prometheus-stack
+spec:
+  jobLabel: envoy-stats
+  selector:
+    matchExpressions:
+      - key: istio-prometheus-ignore
+        operator: DoesNotExist
+  namespaceSelector:
+    any: true
+  podMetricsEndpoints:
+    - path: /stats/prometheus
+      interval: 15s
+      relabelings:
+        # Keep only pods with istio-proxy container
+        - action: keep
+          sourceLabels:
+            - __meta_kubernetes_pod_container_name
+          regex: istio-proxy
+        # Keep only pods with prometheus.io/scrape annotation
+        - action: keep
+          sourceLabels:
+            - __meta_kubernetes_pod_annotationpresent_prometheus_io_scrape
+        # Use the annotated port for scraping
+        - action: replace
+          regex: (\d+);((([0-9]+?)(\.|$)){4})
+          replacement: $2:$1
+          sourceLabels:
+            - __meta_kubernetes_pod_annotation_prometheus_io_port
+            - __meta_kubernetes_pod_ip
+          targetLabel: __address__
+        # Add namespace label
+        - sourceLabels:
+            - __meta_kubernetes_namespace
+          action: replace
+          targetLabel: namespace
+        # Add pod label
+        - sourceLabels:
+            - __meta_kubernetes_pod_name
+          action: replace
+          targetLabel: pod

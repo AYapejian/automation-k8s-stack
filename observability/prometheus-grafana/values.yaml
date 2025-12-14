@@ -1,0 +1,133 @@
+# kube-prometheus-stack Helm values for k3d
+# https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack
+#
+# Optimized for local development with reduced resource requirements.
+# Alertmanager disabled (enabled in Phase 3.4).
+
+# Disable alertmanager for now (Phase 3.4 adds alerting)
+alertmanager:
+  enabled: false
+
+# Grafana configuration
+grafana:
+  enabled: true
+  adminPassword: admin  # Default for local dev
+
+  # k3d-optimized resources
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  # Service configuration (ClusterIP, VirtualService handles ingress)
+  service:
+    type: ClusterIP
+    port: 80
+
+  # Datasource auto-provisioning (enabled by default)
+  sidecar:
+    datasources:
+      enabled: true
+      defaultDatasourceEnabled: true
+    dashboards:
+      enabled: true
+      searchNamespace: ALL
+
+  # Grafana.ini overrides
+  grafana.ini:
+    server:
+      root_url: "https://grafana.localhost:8443"
+    auth.anonymous:
+      enabled: true
+      org_role: Viewer  # Allow anonymous viewing in local dev
+
+# Prometheus configuration
+prometheus:
+  prometheusSpec:
+    # k3d-optimized resources
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    # Short retention for local dev
+    retention: 24h
+    retentionSize: 1GB
+
+    # No persistent storage for k3d (ephemeral)
+    storageSpec: {}
+
+    # ServiceMonitor/PodMonitor discovery - find ALL monitors across all namespaces
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorNamespaceSelector: {}
+    podMonitorNamespaceSelector: {}
+
+    # Scrape interval
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+
+# Prometheus Operator configuration
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# kube-state-metrics
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# node-exporter
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+
+# Disable rules that don't apply to k3d
+defaultRules:
+  create: true
+  rules:
+    alertmanager: false
+    etcd: false  # k3d/k3s uses SQLite, not etcd
+    kubeApiserverAvailability: false
+    kubeApiserverBurnrate: false
+    kubeApiserverHistogram: false
+    kubeApiserverSlos: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+
+# Disable components we don't need
+kubeApiServer:
+  enabled: true
+
+kubeControllerManager:
+  enabled: false  # Not accessible in k3d
+
+kubeScheduler:
+  enabled: false  # Not accessible in k3d
+
+kubeProxy:
+  enabled: false  # k3d uses kube-proxy but metrics may not be accessible
+
+kubeEtcd:
+  enabled: false  # k3d/k3s uses SQLite

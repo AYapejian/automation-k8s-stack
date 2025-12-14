@@ -1,0 +1,10 @@
+# Observability namespace
+# NOTE: Istio sidecar injection is NOT enabled for this namespace.
+# This allows Prometheus to scrape metrics from meshed workloads without mTLS complexity.
+# Prometheus uses prometheus.io annotations and Istio's merged metrics port (15020).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+  labels:
+    name: observability
