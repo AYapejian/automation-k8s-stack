@@ -28,9 +28,9 @@ echo "[INFO] Setting up directories..."
 # Ensure .claude directory exists (bind-mounted from host, so skip chmod)
 mkdir -p ~/.claude
 
-# Create bash history directory (for persistent history volume)
-mkdir -p ~/.bash_history_dir
-touch ~/.bash_history_dir/.bash_history
+# # Create bash history directory (for persistent history volume)
+# mkdir -p ~/.bash_history_dir
+# touch ~/.bash_history_dir/.bash_history
 
 # =============================================================================
 # Shell Completions
@@ -41,10 +41,10 @@ echo "[INFO] Configuring shell completions..."
 BASHRC_ADDITIONS='
 # === Devcontainer Shell Customizations ===
 
-# Persistent bash history (mounted volume)
-export HISTFILE=~/.bash_history_dir/.bash_history
-export HISTSIZE=10000
-export HISTFILESIZE=20000
+# # Persistent bash history (mounted volume)
+# export HISTFILE=~/.bash_history_dir/.bash_history
+# export HISTSIZE=10000
+# export HISTFILESIZE=20000
 
 # kubectl completion and alias
 source <(kubectl completion bash)
