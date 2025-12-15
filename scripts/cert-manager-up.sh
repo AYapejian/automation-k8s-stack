@@ -140,7 +140,7 @@ apply_resources() {
     local attempt=1
 
     while [[ ${attempt} -le ${max_attempts} ]]; do
-        if kubectl apply -f "${CERT_MANAGER_DIR}/resources/"; then
+        if kubectl apply -k "${CERT_MANAGER_DIR}/resources/"; then
             log_info "Resources applied successfully"
             break
         else
