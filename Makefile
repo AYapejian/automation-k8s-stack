@@ -294,6 +294,34 @@ home-automation-status: ## Show Home Automation stack status
 home-automation-test: ## Run Home Automation integration tests
 	@$(SCRIPTS_DIR)/home-automation-test.sh
 
+##@ Media Stack
+
+media-stack-up: ## Deploy Media stack (nzbget, Sonarr, Radarr)
+	@$(SCRIPTS_DIR)/media-stack-up.sh
+
+media-stack-down: ## Remove Media stack (idempotent)
+	@$(SCRIPTS_DIR)/media-stack-down.sh --force
+
+media-stack-status: ## Show Media stack status
+	@echo "Checking Media stack status..."
+	@echo ""
+	@echo "Pods:"
+	@kubectl get pods -n media 2>/dev/null || echo "  media namespace not found"
+	@echo ""
+	@echo "Services:"
+	@kubectl get svc -n media 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "PVCs:"
+	@kubectl get pvc -n media 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Access URLs:"
+	@echo "  nzbget:  https://nzbget.localhost:8443"
+	@echo "  Sonarr:  https://sonarr.localhost:8443"
+	@echo "  Radarr:  https://radarr.localhost:8443"
+
+media-stack-test: ## Run Media stack integration tests
+	@$(SCRIPTS_DIR)/media-stack-test.sh
+
 ##@ ArgoCD (GitOps)
 
 argocd-up: ## Bootstrap ArgoCD for GitOps cluster management (idempotent)

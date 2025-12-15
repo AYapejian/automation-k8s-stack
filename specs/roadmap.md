@@ -273,7 +273,7 @@ Node Affinity:
 - [ ] MQTT communication works between HA and Zigbee2MQTT
 
 ### 5.2 Media Stack
-**Branch**: `feature/media-stack`
+**Branch**: `feature/5.2-media-stack`
 
 Components:
 - nzbget
@@ -283,9 +283,9 @@ Components:
 Shared storage via PVC (NAS in prod).
 
 **Acceptance Criteria**:
-- [ ] All services accessible via ingress
-- [ ] Services can communicate with each other
-- [ ] Metrics exported to Prometheus
+- [x] All services accessible via ingress
+- [x] Services can communicate with each other (shared downloads PVC)
+- [x] Metrics exported to Prometheus (ServiceMonitors)
 
 ### 5.3 Security Stack (Frigate)
 **Branch**: `feature/frigate`

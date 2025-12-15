@@ -1,0 +1,74 @@
+# nzbget Deployment - Usenet downloader
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nzbget
+  namespace: media
+  labels:
+    app.kubernetes.io/name: nzbget
+    app.kubernetes.io/component: downloader
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Avoid file locks on shared storage
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nzbget
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nzbget
+        app.kubernetes.io/component: downloader
+    spec:
+      containers:
+        - name: nzbget
+          image: lscr.io/linuxserver/nzbget:24.4
+          ports:
+            - containerPort: 6789
+              name: http
+              protocol: TCP
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: TZ
+              value: "UTC"
+          envFrom:
+            - configMapRef:
+                name: nzbget-config
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: downloads
+              mountPath: /downloads
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+          securityContext:
+            privileged: false
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: nzbget-config
+        - name: downloads
+          persistentVolumeClaim:
+            claimName: media-downloads

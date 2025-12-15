@@ -1,0 +1,18 @@
+# nzbget service
+apiVersion: v1
+kind: Service
+metadata:
+  name: nzbget
+  namespace: media
+  labels:
+    app.kubernetes.io/name: nzbget
+    app.kubernetes.io/component: downloader
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6789
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: nzbget

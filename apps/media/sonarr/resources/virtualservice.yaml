@@ -1,0 +1,21 @@
+# VirtualService routes traffic from Gateway to Sonarr
+# Accessible at https://sonarr.localhost:8443
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: sonarr
+  namespace: media
+spec:
+  hosts:
+    - "sonarr.localhost"
+  gateways:
+    - istio-ingress/main-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: sonarr.media.svc.cluster.local
+            port:
+              number: 8989
