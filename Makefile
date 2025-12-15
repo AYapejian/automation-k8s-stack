@@ -323,7 +323,7 @@ argocd-status: ## Show ArgoCD status and applications
 
 ##@ Stack Management
 
-stack-up: ## Deploy complete infrastructure stack (cluster + platform + observability)
+stack-up: ## Deploy complete infrastructure stack via ArgoCD GitOps (cluster + argocd + sync)
 	@$(SCRIPTS_DIR)/stack-up.sh
 
 stack-down: ## Tear down complete infrastructure stack
