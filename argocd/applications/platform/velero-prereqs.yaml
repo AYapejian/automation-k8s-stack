@@ -1,0 +1,29 @@
+# Velero Prerequisites - Namespace and Credentials Secret
+# Sync Wave 12: After Minio is running (Velero depends on Minio for storage)
+# Note: Secret contains credentials - ensure this is converted to SealedSecret for production
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: velero-prereqs
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "12"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+    targetRevision: HEAD
+    path: platform/velero/resources
+    directory:
+      include: '{namespace.yaml,secret.yaml}'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: velero
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

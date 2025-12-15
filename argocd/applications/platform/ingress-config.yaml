@@ -1,0 +1,30 @@
+# Ingress Configuration - Gateway and TLS Certificate
+# Sync Wave 4: Requires cert-manager ClusterIssuers and Istio Gateway
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ingress-config
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+    targetRevision: HEAD
+    path: platform/ingress/resources
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-ingress
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

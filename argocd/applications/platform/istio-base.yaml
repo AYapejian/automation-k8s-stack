@@ -1,0 +1,35 @@
+# Istio Base - CRDs and cluster-wide resources
+# Sync Wave 0: Must be installed before any other Istio components
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-base
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  sources:
+    # Helm chart from Istio repo
+    - chart: base
+      repoURL: https://istio-release.storage.googleapis.com/charts
+      targetRevision: 1.24.0
+      helm:
+        valueFiles:
+          - $values/platform/istio/base/values.yaml
+    # Values from this repo
+    - repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

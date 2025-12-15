@@ -1,4 +1,4 @@
-.PHONY: help cluster-up cluster-down cluster-status kubeconfig istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status loki-test tracing-up tracing-down tracing-status dashboards-test minio-up minio-down minio-status velero-up velero-down velero-status velero-test home-automation-up home-automation-down home-automation-status home-automation-test stack-up stack-down stack-status test lint clean
+.PHONY: help cluster-up cluster-down cluster-status kubeconfig istio-up istio-down istio-status cert-manager-up cert-manager-down cert-manager-status ingress-up ingress-down ingress-status sample-app-up sample-app-down sample-app-status storage-test storage-test-down storage-status prometheus-grafana-up prometheus-grafana-down prometheus-grafana-status loki-up loki-down loki-status loki-test tracing-up tracing-down tracing-status dashboards-test minio-up minio-down minio-status velero-up velero-down velero-status velero-test home-automation-up home-automation-down home-automation-status home-automation-test argocd-up argocd-down argocd-status stack-up stack-down stack-status test lint clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -294,9 +294,36 @@ home-automation-status: ## Show Home Automation stack status
 home-automation-test: ## Run Home Automation integration tests
 	@$(SCRIPTS_DIR)/home-automation-test.sh
 
+##@ ArgoCD (GitOps)
+
+argocd-up: ## Bootstrap ArgoCD for GitOps cluster management (idempotent)
+	@$(SCRIPTS_DIR)/argocd-up.sh
+
+argocd-down: ## Uninstall ArgoCD (idempotent)
+	@$(SCRIPTS_DIR)/argocd-down.sh
+
+argocd-status: ## Show ArgoCD status and applications
+	@echo "Checking ArgoCD status..."
+	@echo ""
+	@echo "Helm release:"
+	@helm list -n argocd 2>/dev/null || echo "  (not installed)"
+	@echo ""
+	@echo "Pods:"
+	@kubectl get pods -n argocd 2>/dev/null || echo "  argocd namespace not found"
+	@echo ""
+	@echo "Applications:"
+	@kubectl get applications -n argocd 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "AppProjects:"
+	@kubectl get appprojects -n argocd 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "Access URLs:"
+	@echo "  ArgoCD UI: https://argocd.localhost:8443"
+	@echo "  Port-forward: kubectl port-forward svc/argocd-server -n argocd 8080:443"
+
 ##@ Stack Management
 
-stack-up: ## Deploy complete infrastructure stack (cluster + platform + observability)
+stack-up: ## Deploy complete infrastructure stack via ArgoCD GitOps (cluster + argocd + sync)
 	@$(SCRIPTS_DIR)/stack-up.sh
 
 stack-down: ## Tear down complete infrastructure stack

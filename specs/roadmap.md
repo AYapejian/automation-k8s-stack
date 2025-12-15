@@ -13,6 +13,7 @@ Each phase represents a logical unit of work. Each numbered item should be imple
 | GitOps | ArgoCD | Feature-rich, good UI, widely adopted |
 | Secrets | Sealed Secrets | Simple, git-native, testable offline, easy to migrate |
 | CI Workflows | Tiered (fast PR + extended) | 88% faster PR feedback; full tests on merge/nightly |
+| ArgoCD Timing | Implemented early (after Phase 5) | GitOps from start; all components managed declaratively |
 
 ---
 
@@ -309,20 +310,26 @@ k3d: Deploy with CPU-only config, no actual camera streams.
 
 **Goal**: GitOps and real hardware deployment.
 
-### 6.1 ArgoCD Setup
-**Branch**: `feature/argocd`
+### 6.1 ArgoCD Setup ✅ (Implemented Early)
+**Branch**: `feature/argocd-*` (multiple PRs)
 
-- Deploy ArgoCD
-- ApplicationSets for:
-  - Platform components
-  - Observability
-  - App stacks
-- App-of-apps pattern
+> **Note**: ArgoCD was implemented after Phase 5.1 to enable GitOps management from the start.
+> All platform, observability, and workload components are now managed via ArgoCD Applications.
+
+Implementation:
+- ArgoCD bootstrap with k3d-optimized configuration
+- App-of-apps pattern with root application
+- Sync waves for dependency ordering (0-20)
+- AppProjects: platform, observability, workloads
+- Multi-source Applications for Helm + Git values
+- VirtualService for ArgoCD UI access
 
 **Acceptance Criteria**:
-- [ ] ArgoCD syncs from this repo
-- [ ] Changes to repo auto-deploy to cluster
-- [ ] Health status visible in ArgoCD UI
+- [x] ArgoCD syncs from this repo
+- [x] Changes to repo auto-deploy to cluster (auto-sync enabled)
+- [x] Health status visible in ArgoCD UI
+- [x] `make stack-up` deploys full stack via ArgoCD
+- [x] CI validates ArgoCD-based deployment
 
 ### 6.2 k3s Deployment Overlays
 **Branch**: `feature/k3s-overlays`
@@ -369,9 +376,9 @@ Examples:
 
 1. Create feature branch from `main`
 2. Implement with tests
-3. PR triggers GHA → k3d cluster → tests
+3. PR triggers GHA → k3d cluster → ArgoCD sync → tests
 4. Merge to `main` after review
-5. ArgoCD syncs `main` to clusters (Phase 6+)
+5. ArgoCD auto-syncs changes to clusters (GitOps enabled)
 
 ---
 

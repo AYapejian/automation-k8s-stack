@@ -89,7 +89,7 @@ check_prerequisites() {
 apply_resources() {
     log_info "Applying Gateway and Certificate resources..."
 
-    kubectl apply -f "${INGRESS_DIR}/resources/"
+    kubectl apply -k "${INGRESS_DIR}/resources/"
 }
 
 # Wait for certificate to be issued

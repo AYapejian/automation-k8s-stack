@@ -1,0 +1,88 @@
+# ArgoCD Helm values for k3d development
+# Chart: argo/argo-cd (version 9.1.7)
+# https://artifacthub.io/packages/helm/argo/argo-cd
+#
+# Deploys ArgoCD for GitOps-based cluster management.
+# Uses reduced resources suitable for k3d development environment.
+
+# Global configuration
+global:
+  domain: argocd.localhost
+
+# CRDs configuration
+crds:
+  install: true
+  keep: false  # Remove CRDs on uninstall for clean teardown in dev
+
+# ArgoCD ConfigMap settings
+configs:
+  cm:
+    # Enable local admin user
+    admin.enabled: true
+    # Reconciliation timeout
+    timeout.reconciliation: 180s
+  params:
+    # Run in insecure mode - TLS handled by Istio Gateway
+    server.insecure: true
+
+# Application controller (syncs applications)
+controller:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# API Server
+server:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Repo Server (clones repos, generates manifests)
+repoServer:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# ApplicationSet Controller (generates Applications from templates)
+applicationSet:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# Dex (SSO) - disabled for k3d development
+dex:
+  enabled: false
+
+# Redis (caching)
+redis:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# Notifications controller - disabled for k3d development
+notifications:
+  enabled: false

@@ -1,0 +1,26 @@
+# Home Automation Stack - HomeAssistant, Mosquitto, Zigbee2MQTT, Homebridge
+# Sync Wave 20: Application workloads after platform and observability
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: home-automation
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: workloads
+  source:
+    repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+    targetRevision: HEAD
+    path: apps/home-automation
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: home-automation
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

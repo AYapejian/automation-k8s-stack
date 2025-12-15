@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# stack-up.sh - Deploy complete infrastructure stack (idempotent)
-# Deploys: cluster -> istio -> cert-manager -> ingress -> prometheus-grafana -> loki
+# stack-up.sh - Deploy complete infrastructure stack via ArgoCD GitOps (idempotent)
+# Deploys: cluster -> ArgoCD -> root app -> waits for sync waves
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CLUSTER_NAME="automation-k8s"
 
 # Colors for output
@@ -39,42 +40,16 @@ cleanup_on_failure() {
 
 trap cleanup_on_failure EXIT
 
-# Define deployment order
-# Each script already has built-in dependency checks and is idempotent
-# Format: "script-name:description"
-COMPONENTS=(
-    "cluster-up:Creating k3d cluster"
-    "istio-up:Installing Istio service mesh"
-    "cert-manager-up:Installing cert-manager"
-    "ingress-up:Configuring Istio Gateway and TLS"
-    "minio-up:Installing Minio object storage"
-    "prometheus-grafana-up:Installing Prometheus + Grafana"
-    "loki-up:Installing Loki + Promtail"
-    "tracing-up:Installing distributed tracing"
-    "velero-up:Installing Velero backup system"
-)
+# Wait for a namespace's pods to be ready
+wait_for_namespace() {
+    local namespace="$1"
+    local timeout="${2:-180}"
+    local label="${3:-}"
 
-# Deploy a single component
-deploy_component() {
-    local script_name="$1"
-    local description="$2"
-    local script_path="${SCRIPT_DIR}/${script_name}.sh"
-
-    if [[ ! -x "${script_path}" ]]; then
-        log_error "Script not found or not executable: ${script_path}"
-        return 1
-    fi
-
-    log_step "${description}..."
-
-    if "${script_path}"; then
-        DEPLOYED_COMPONENTS+=("${description}")
-        log_info "${description} - complete"
-        echo ""
-        return 0
+    if [ -n "$label" ]; then
+        kubectl wait --for=condition=Ready pods -l "$label" -n "$namespace" --timeout="${timeout}s" 2>/dev/null || true
     else
-        log_error "${description} - FAILED"
-        return 1
+        kubectl wait --for=condition=Ready pods --all -n "$namespace" --timeout="${timeout}s" 2>/dev/null || true
     fi
 }
 
@@ -85,22 +60,28 @@ print_urls() {
     echo "  Stack Deployment Complete!"
     echo "==========================================${NC}"
     echo ""
-    echo -e "${BOLD}Access URLs:${NC}"
-    echo "  Grafana:    https://grafana.localhost:8443"
+    echo -e "${BOLD}GitOps Management:${NC}"
+    echo "  ArgoCD UI:  https://argocd.localhost:8443"
     echo "              Username: admin"
-    echo "              Password: admin"
+    echo "              Password: (run 'make argocd-status' for password)"
     echo ""
+    echo -e "${BOLD}Observability:${NC}"
+    echo "  Grafana:    https://grafana.localhost:8443"
+    echo "              Username: admin / Password: admin"
     echo "  Prometheus: https://prometheus.localhost:8443"
     echo "  Jaeger:     https://jaeger.localhost:8443"
-    echo "  Minio:      https://minio.localhost:8443"
-    echo "              Username: minioadmin"
-    echo "              Password: minioadmin123"
     echo ""
-    echo -e "${BOLD}Grafana Features:${NC}"
-    echo "  - Explore -> Prometheus: Query metrics"
-    echo "  - Explore -> Loki: Query logs"
-    echo "  - Explore -> Tempo: Query traces"
-    echo "  - Dashboards: Pre-configured Kubernetes dashboards"
+    echo -e "${BOLD}Storage:${NC}"
+    echo "  Minio:      https://minio.localhost:8443"
+    echo "              Username: minioadmin / Password: minioadmin123"
+    echo ""
+    echo -e "${BOLD}Home Automation:${NC}"
+    echo "  HomeAssistant:  https://homeassistant.localhost:8443"
+    echo "  Zigbee2MQTT:    https://zigbee2mqtt.localhost:8443"
+    echo "  Homebridge:     https://homebridge.localhost:8443"
+    echo ""
+    echo -e "${BOLD}Sample Apps:${NC}"
+    echo "  httpbin:    https://httpbin.localhost:8443"
     echo ""
 }
 
@@ -111,13 +92,10 @@ print_kubeconfig() {
     echo ""
 }
 
-# Print optional next steps
+# Print useful commands
 print_next_steps() {
-    echo -e "${BOLD}Optional: Deploy sample application${NC}"
-    echo "  make sample-app-up                           # Deploy httpbin"
-    echo "  curl -k https://httpbin.localhost:8443/get   # Test connectivity"
-    echo ""
     echo -e "${BOLD}Useful commands:${NC}"
+    echo "  make argocd-status  # View ArgoCD applications and password"
     echo "  make stack-status   # Check overall stack health"
     echo "  make stack-down     # Tear down entire stack"
     echo ""
@@ -125,26 +103,120 @@ print_next_steps() {
 
 main() {
     echo ""
-    echo -e "${BOLD}Deploying Infrastructure Stack${NC}"
-    echo "==============================="
+    echo -e "${BOLD}Deploying Infrastructure Stack via ArgoCD GitOps${NC}"
+    echo "================================================="
     echo ""
-    echo "Components to deploy:"
-    for component_entry in "${COMPONENTS[@]}"; do
-        local description="${component_entry#*:}"
-        echo "  - ${description}"
-    done
+    echo "Deployment steps:"
+    echo "  1. Create k3d cluster"
+    echo "  2. Bootstrap ArgoCD"
+    echo "  3. Apply root application (app-of-apps)"
+    echo "  4. Wait for sync waves to complete"
     echo ""
 
     local start_time
     start_time=$(date +%s)
 
-    # Deploy each component in order
-    # set -e ensures we stop on first failure
-    for component_entry in "${COMPONENTS[@]}"; do
-        local script_name="${component_entry%%:*}"
-        local description="${component_entry#*:}"
-        deploy_component "${script_name}" "${description}"
-    done
+    # Step 1: Create k3d cluster
+    log_step "Creating k3d cluster..."
+    if "${SCRIPT_DIR}/cluster-up.sh"; then
+        DEPLOYED_COMPONENTS+=("k3d cluster")
+        log_info "Cluster created"
+    else
+        log_error "Failed to create cluster"
+        exit 1
+    fi
+    echo ""
+
+    # Step 2: Bootstrap ArgoCD
+    log_step "Bootstrapping ArgoCD..."
+    if "${SCRIPT_DIR}/argocd-up.sh"; then
+        DEPLOYED_COMPONENTS+=("ArgoCD")
+        log_info "ArgoCD bootstrapped"
+    else
+        log_error "Failed to bootstrap ArgoCD"
+        exit 1
+    fi
+    echo ""
+
+    # Step 3: Apply root application
+    log_step "Applying root application (app-of-apps)..."
+    if kubectl apply -f "${REPO_ROOT}/argocd/applications/root-app.yaml"; then
+        DEPLOYED_COMPONENTS+=("Root application")
+        log_info "Root application applied"
+    else
+        log_error "Failed to apply root application"
+        exit 1
+    fi
+    echo ""
+
+    # Step 4: Wait for sync waves
+    log_step "Waiting for ArgoCD to sync applications..."
+    echo "  Sync waves will deploy in order:"
+    echo "    Wave 0:  Istio CRDs"
+    echo "    Wave 1:  Istiod control plane"
+    echo "    Wave 2:  cert-manager"
+    echo "    Wave 4:  Istio Gateway, Ingress"
+    echo "    Wave 5:  Minio"
+    echo "    Wave 10: Prometheus/Grafana, Loki"
+    echo "    Wave 11: Tracing (Jaeger, Tempo, OTel)"
+    echo "    Wave 12: Velero"
+    echo "    Wave 20: Home Automation, Sample Apps"
+    echo ""
+
+    # Wait for critical platform components
+    log_info "Waiting for platform layer (waves 0-5)..."
+
+    # Wait for Istio CRDs
+    log_info "  Waiting for Istio CRDs..."
+    timeout 180 bash -c 'until kubectl get crd gateways.networking.istio.io 2>/dev/null; do sleep 5; done' || true
+
+    # Wait for Istiod
+    log_info "  Waiting for Istiod..."
+    wait_for_namespace "istio-system" 180 "app=istiod"
+
+    # Wait for cert-manager
+    log_info "  Waiting for cert-manager..."
+    wait_for_namespace "cert-manager" 180
+
+    # Wait for Istio ingress
+    log_info "  Waiting for Istio gateway..."
+    wait_for_namespace "istio-ingress" 120
+
+    # Wait for Minio
+    log_info "  Waiting for Minio..."
+    wait_for_namespace "minio" 180 "release=minio"
+
+    DEPLOYED_COMPONENTS+=("Platform layer")
+    echo ""
+
+    # Wait for observability
+    log_info "Waiting for observability layer (waves 10-12)..."
+
+    log_info "  Waiting for Prometheus..."
+    wait_for_namespace "observability" 180 "app.kubernetes.io/name=prometheus"
+
+    log_info "  Waiting for Grafana..."
+    wait_for_namespace "observability" 180 "app.kubernetes.io/name=grafana"
+
+    DEPLOYED_COMPONENTS+=("Observability layer")
+    echo ""
+
+    # Wait for workloads
+    log_info "Waiting for workloads layer (wave 20)..."
+
+    log_info "  Waiting for Home Automation..."
+    wait_for_namespace "home-automation" 180 "app.kubernetes.io/name=mosquitto"
+
+    log_info "  Waiting for sample app..."
+    wait_for_namespace "ingress-sample" 120 "app=httpbin"
+
+    DEPLOYED_COMPONENTS+=("Workloads layer")
+    echo ""
+
+    # Show ArgoCD application status
+    log_step "ArgoCD Application Status:"
+    kubectl get applications -n argocd 2>/dev/null || echo "  (applications still syncing)"
+    echo ""
 
     local end_time
     end_time=$(date +%s)

@@ -179,7 +179,7 @@ install_gateway() {
 # Apply security and telemetry resources
 apply_resources() {
     log_info "Applying Istio security and telemetry resources..."
-    kubectl apply -f "${ISTIO_DIR}/resources/"
+    kubectl apply -k "${ISTIO_DIR}/resources/"
 }
 
 # Verify installation

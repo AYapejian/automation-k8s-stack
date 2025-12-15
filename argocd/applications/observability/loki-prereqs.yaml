@@ -1,0 +1,26 @@
+# Loki Prerequisites - Minio credentials for S3 storage
+# Sync Wave 10: Requires Minio to be running
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki-prereqs
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: observability
+  source:
+    repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+    targetRevision: HEAD
+    path: observability/loki/resources
+    directory:
+      include: 'minio-credentials.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

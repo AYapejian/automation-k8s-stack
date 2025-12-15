@@ -1,0 +1,34 @@
+# Minio - S3-compatible Object Storage
+# Sync Wave 5: Requires namespace and secret to exist
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  sources:
+    # Helm chart from Minio repo
+    - chart: minio
+      repoURL: https://charts.min.io/
+      targetRevision: 5.2.0
+      helm:
+        valueFiles:
+          - $values/platform/minio/values.yaml
+    # Values from this repo
+    - repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: minio
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
