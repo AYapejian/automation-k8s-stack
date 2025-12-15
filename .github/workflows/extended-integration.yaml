@@ -74,7 +74,11 @@ jobs:
       - name: Verify ArgoCD is running
         run: |
           echo "Verifying ArgoCD components..."
-          kubectl wait --for=condition=Ready pods --all -n argocd --timeout=180s
+          # Wait for specific deployments (excludes Completed job pods)
+          kubectl wait --for=condition=Available deployment/argocd-server -n argocd --timeout=180s
+          kubectl wait --for=condition=Available deployment/argocd-repo-server -n argocd --timeout=180s
+          kubectl wait --for=condition=Available deployment/argocd-applicationset-controller -n argocd --timeout=180s
+          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argocd-application-controller -n argocd --timeout=180s
           echo "ArgoCD is ready"
 
       - name: Apply root application
