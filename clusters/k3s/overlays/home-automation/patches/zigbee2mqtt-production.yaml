@@ -1,0 +1,39 @@
+# Zigbee2MQTT production patches for k3s
+# - Real Zigbee coordinator USB device
+# - Required node affinity for Zigbee hardware
+# - Privileged access for USB device
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zigbee2mqtt
+  namespace: home-automation
+spec:
+  template:
+    spec:
+      containers:
+        - name: zigbee2mqtt
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            privileged: true  # Required for USB access
+          volumeMounts:
+            - name: zigbee-device
+              mountPath: /dev/ttyUSB0  # Adjust path based on your device
+      volumes:
+        - name: zigbee-device
+          hostPath:
+            path: /dev/ttyUSB0  # Adjust to match your Zigbee coordinator
+            type: CharDevice
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: hardware/zigbee
+                    operator: In
+                    values: ["true"]

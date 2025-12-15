@@ -1,0 +1,18 @@
+# Mosquitto production patches for k3s
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mosquitto
+  namespace: home-automation
+spec:
+  template:
+    spec:
+      containers:
+        - name: mosquitto
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
