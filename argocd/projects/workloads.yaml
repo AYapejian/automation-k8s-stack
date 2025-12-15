@@ -1,0 +1,40 @@
+# ArgoCD AppProject for Application Workloads
+# Manages: Home Automation, Media, Security stacks
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: workloads
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Application workloads
+
+  # Allow applications from this repo
+  sourceRepos:
+    - 'https://github.com/AYapejian/automation-k8s-stack.git'
+
+  # Allowed destination namespaces for application workloads
+  destinations:
+    - namespace: home-automation
+      server: https://kubernetes.default.svc
+    - namespace: media
+      server: https://kubernetes.default.svc
+    - namespace: security
+      server: https://kubernetes.default.svc
+    - namespace: sample
+      server: https://kubernetes.default.svc
+
+  # Workloads don't need cluster-wide resources
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+
+  # Allow common namespaced resources
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  # Orphaned resources warning
+  orphanedResources:
+    warn: true

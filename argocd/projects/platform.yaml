@@ -1,0 +1,49 @@
+# ArgoCD AppProject for Platform Infrastructure
+# Manages: Istio, cert-manager, sealed-secrets, minio, velero
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Platform infrastructure components
+
+  # Allow applications from this repo
+  sourceRepos:
+    - 'https://github.com/AYapejian/automation-k8s-stack.git'
+    - 'https://istio-release.storage.googleapis.com/charts'
+    - 'https://charts.jetstack.io'
+    - 'https://bitnami-labs.github.io/sealed-secrets'
+    - 'https://charts.min.io/'
+    - 'https://vmware-tanzu.github.io/helm-charts'
+
+  # Allowed destination namespaces for platform components
+  destinations:
+    - namespace: istio-system
+      server: https://kubernetes.default.svc
+    - namespace: istio-ingress
+      server: https://kubernetes.default.svc
+    - namespace: cert-manager
+      server: https://kubernetes.default.svc
+    - namespace: sealed-secrets
+      server: https://kubernetes.default.svc
+    - namespace: minio
+      server: https://kubernetes.default.svc
+    - namespace: velero
+      server: https://kubernetes.default.svc
+
+  # Allow cluster-wide resources (CRDs, ClusterRoles, etc.)
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  # Allow all namespaced resources
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  # Orphaned resources warning
+  orphanedResources:
+    warn: true

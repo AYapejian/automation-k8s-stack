@@ -1,0 +1,38 @@
+# ArgoCD AppProject for Observability Stack
+# Manages: Prometheus, Grafana, Loki, Jaeger, Tempo, OTel Collector
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: observability
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Observability stack components
+
+  # Allow applications from this repo and Helm chart repos
+  sourceRepos:
+    - 'https://github.com/AYapejian/automation-k8s-stack.git'
+    - 'https://prometheus-community.github.io/helm-charts'
+    - 'https://grafana.github.io/helm-charts'
+    - 'https://jaegertracing.github.io/helm-charts'
+    - 'https://open-telemetry.github.io/opentelemetry-helm-charts'
+
+  # Allowed destination namespaces for observability components
+  destinations:
+    - namespace: observability
+      server: https://kubernetes.default.svc
+
+  # Allow cluster-wide resources (ServiceMonitors use cluster scope sometimes)
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  # Allow all namespaced resources
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  # Orphaned resources warning
+  orphanedResources:
+    warn: true
