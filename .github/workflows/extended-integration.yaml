@@ -29,13 +29,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate YAML syntax
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Run yamllint
         run: |
-          echo "Checking for YAML syntax errors..."
-          find . -name '*.yaml' -o -name '*.yml' | while read file; do
-            python3 -c "import yaml; yaml.safe_load(open('$file'))" 2>/dev/null || echo "Warning: $file may have issues"
-          done
-          echo "YAML validation complete"
+          echo "Running yamllint..."
+          yamllint -c .yamllint.yaml . && echo "YAML lint: PASSED"
 
       - name: Validate Makefile exists
         run: |
