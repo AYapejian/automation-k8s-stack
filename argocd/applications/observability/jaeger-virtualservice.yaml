@@ -1,0 +1,26 @@
+# Jaeger VirtualService - Ingress routing for Jaeger UI
+# Sync Wave 11: After Jaeger is running
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jaeger-virtualservice
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "11"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: observability
+  source:
+    repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+    targetRevision: HEAD
+    path: observability/jaeger/resources
+    directory:
+      include: 'virtualservice.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

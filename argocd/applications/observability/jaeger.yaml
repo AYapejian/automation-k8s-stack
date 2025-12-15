@@ -1,0 +1,34 @@
+# Jaeger - Distributed Tracing UI and Query
+# Sync Wave 11: Provides tracing UI alongside Tempo
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jaeger
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "11"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: observability
+  sources:
+    # Helm chart from Jaeger
+    - chart: jaeger
+      repoURL: https://jaegertracing.github.io/helm-charts
+      targetRevision: 4.1.4
+      helm:
+        valueFiles:
+          - $values/observability/jaeger/values.yaml
+    # Values from this repo
+    - repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

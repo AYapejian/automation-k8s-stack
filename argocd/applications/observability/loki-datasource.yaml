@@ -1,0 +1,26 @@
+# Loki Grafana Datasource
+# Sync Wave 10: After Loki and Grafana are running
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki-datasource
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: observability
+  source:
+    repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+    targetRevision: HEAD
+    path: observability/loki/resources
+    directory:
+      include: 'grafana-datasource.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

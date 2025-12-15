@@ -1,0 +1,34 @@
+# OpenTelemetry Collector - Trace/Metric collection and routing
+# Sync Wave 11: Routes traces to Tempo and Jaeger
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: otel-collector
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "11"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: observability
+  sources:
+    # Helm chart from OpenTelemetry
+    - chart: opentelemetry-collector
+      repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+      targetRevision: 0.141.1
+      helm:
+        valueFiles:
+          - $values/observability/otel-collector/values.yaml
+    # Values from this repo
+    - repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
