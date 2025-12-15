@@ -1,0 +1,26 @@
+# Sample App - httpbin for testing ingress and mesh functionality
+# Sync Wave 20: Application workloads
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sample-app
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: workloads
+  source:
+    repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+    targetRevision: HEAD
+    path: apps/sample/httpbin
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ingress-sample
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
