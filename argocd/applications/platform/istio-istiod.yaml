@@ -1,0 +1,34 @@
+# Istio Control Plane (istiod)
+# Sync Wave 1: Requires istio-base CRDs to be installed first
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-istiod
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  sources:
+    # Helm chart from Istio repo
+    - chart: istiod
+      repoURL: https://istio-release.storage.googleapis.com/charts
+      targetRevision: 1.24.0
+      helm:
+        valueFiles:
+          - $values/platform/istio/istiod/values.yaml
+    # Values from this repo
+    - repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

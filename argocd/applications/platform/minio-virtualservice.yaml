@@ -1,0 +1,26 @@
+# Minio VirtualService - Ingress routing for Minio Console
+# Sync Wave 5: Requires Minio and Istio Gateway
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio-virtualservice
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+    targetRevision: HEAD
+    path: platform/minio/resources
+    directory:
+      include: 'virtualservice.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: minio
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

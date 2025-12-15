@@ -1,0 +1,34 @@
+# Velero - Kubernetes Backup and Restore
+# Sync Wave 12: Requires Minio to be running for backup storage
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: velero
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "12"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  sources:
+    # Helm chart from VMware Tanzu repo
+    - chart: velero
+      repoURL: https://vmware-tanzu.github.io/helm-charts
+      targetRevision: 7.2.1
+      helm:
+        valueFiles:
+          - $values/platform/velero/values.yaml
+    # Values from this repo
+    - repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: velero
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

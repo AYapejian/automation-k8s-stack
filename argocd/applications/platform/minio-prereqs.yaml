@@ -1,0 +1,29 @@
+# Minio Prerequisites - Namespace and Secret
+# Sync Wave 5: Before Minio Helm release
+# Note: Secret contains credentials - ensure this is converted to SealedSecret for production
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio-prereqs
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/AYapejian/automation-k8s-stack.git
+    targetRevision: HEAD
+    path: platform/minio/resources
+    directory:
+      include: '{namespace.yaml,secret.yaml}'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: minio
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
