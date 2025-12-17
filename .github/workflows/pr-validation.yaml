@@ -92,9 +92,30 @@ jobs:
       - name: Test ingress routing
         run: |
           kubectl wait --for=condition=Ready pods -l app=httpbin -n ingress-sample --timeout=120s
-          # Test HTTPS
-          RESPONSE=$(curl -sk -H "Host: httpbin.localhost" https://localhost:8443/get)
-          echo "$RESPONSE" | jq -e '.url' && echo "HTTPS routing verified"
+
+          # Test HTTPS with retries (gateway may need time to be ready)
+          echo "Testing HTTPS ingress..."
+          ROUTING_VERIFIED=false
+          for i in {1..5}; do
+            RESPONSE=$(curl -sk -H "Host: httpbin.localhost" https://localhost:8443/get 2>/dev/null || true)
+            if echo "$RESPONSE" | jq -e '.url' >/dev/null 2>&1; then
+              echo "HTTPS routing verified"
+              ROUTING_VERIFIED=true
+              break
+            fi
+            echo "Retry $i/5... (waiting for ingress gateway)"
+            sleep 10
+          done
+
+          if [ "$ROUTING_VERIFIED" != "true" ]; then
+            echo "HTTPS routing failed after 5 attempts"
+            echo "Last response: $RESPONSE"
+            # Show gateway status for debugging
+            kubectl get pods -n istio-ingress
+            kubectl get gateway -A
+            exit 1
+          fi
+
           # Verify sidecar injection
           CONTAINERS=$(kubectl get pod -l app=httpbin -n ingress-sample -o jsonpath='{.items[0].spec.containers[*].name}')
           echo "$CONTAINERS" | grep -q "istio-proxy" && echo "Sidecar injection verified"
