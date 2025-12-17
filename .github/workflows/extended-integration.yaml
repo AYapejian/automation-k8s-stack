@@ -92,8 +92,8 @@ jobs:
           BRANCH="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
           echo "Using branch: $BRANCH"
 
-          # Modify root-app to use PR branch instead of HEAD
-          sed "s/targetRevision: HEAD/targetRevision: $BRANCH/g" argocd/applications/root-app.yaml > /tmp/root-app.yaml
+          # Modify root-app to use PR branch instead of HEAD (use | delimiter for branch names with /)
+          sed "s|targetRevision: HEAD|targetRevision: $BRANCH|g" argocd/applications/root-app.yaml > /tmp/root-app.yaml
           cat /tmp/root-app.yaml
           kubectl apply -f /tmp/root-app.yaml
           echo "Root application applied with branch: $BRANCH"
