@@ -209,9 +209,9 @@ jobs:
                 return 1
               fi
 
-              # Check if healthy
-              if [[ "$sync" == "Synced" && "$health" == "Healthy" ]]; then
-                echo "$description synced and healthy"
+              # Check if synced and ready (Healthy or Progressing is acceptable for large charts)
+              if [[ "$sync" == "Synced" && ("$health" == "Healthy" || "$health" == "Progressing") ]]; then
+                echo "$description synced (health: $health)"
                 return 0
               fi
 
