@@ -88,6 +88,14 @@ main() {
     setup_kubeconfig
     check_cluster
 
+    # ArgoCD health check - CRITICAL: must pass for stack to function
+    # This catches AppProject restrictions, CRD dependencies, selector mismatches
+    if kubectl get namespace argocd >/dev/null 2>&1; then
+        run_test "ArgoCD Health" "${SCRIPT_DIR}/argocd-health-test.sh"
+    else
+        log_warn "ArgoCD not installed, skipping health test"
+    fi
+
     # Core infrastructure tests
     run_test "Storage Test" "${SCRIPT_DIR}/storage-test-up.sh"
 
