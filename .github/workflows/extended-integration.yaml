@@ -96,6 +96,11 @@ jobs:
         run: |
           echo "Waiting for prometheus-grafana Application to be created..."
           timeout 120 bash -c 'until kubectl get application prometheus-grafana -n argocd 2>/dev/null; do sleep 5; done'
+
+          # Show current Application spec before patching
+          echo "Current prometheus-grafana Application spec:"
+          kubectl get application prometheus-grafana -n argocd -o yaml | head -50
+
           echo "Patching prometheus-grafana to disable admission webhooks..."
           kubectl patch application prometheus-grafana -n argocd --type=json -p='[
             {
@@ -110,8 +115,17 @@ jobs:
               }
             }
           ]'
-          echo "Patch applied, triggering refresh..."
+
+          echo "Patch applied, triggering hard refresh..."
           kubectl patch application prometheus-grafana -n argocd --type=merge -p='{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
+
+          # Wait for ArgoCD to start processing the refresh
+          echo "Waiting for ArgoCD to process the refresh..."
+          sleep 15
+
+          # Verify patch was applied and show updated spec
+          echo "Updated prometheus-grafana Application spec:"
+          kubectl get application prometheus-grafana -n argocd -o jsonpath='{.spec.sources[0].helm}' | jq '.' 2>/dev/null || kubectl get application prometheus-grafana -n argocd -o jsonpath='{.spec.sources[0].helm}'
 
       - name: Wait for ArgoCD sync (platform layer)
         run: |
