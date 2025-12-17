@@ -47,6 +47,7 @@ jobs:
         uses: AbsaOSS/k3d-action@v2.4.0
         with:
           cluster-name: automation-k8s
+          k3d-version: v5.7.4
           args: --config clusters/k3d/cluster-config.yaml
 
       - name: Install Helm and tools
