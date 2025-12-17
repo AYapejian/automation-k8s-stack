@@ -83,20 +83,58 @@ jobs:
           kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argocd-application-controller -n argocd --timeout=180s
           echo "ArgoCD is ready"
 
-      # Configure root app to use the current PR branch for testing
-      # This ensures ArgoCD fetches Application definitions from PR, not main
+      # Configure all ArgoCD apps to use the current PR branch for testing
+      # This ensures ArgoCD fetches Application definitions AND values from PR, not main
       - name: Apply root application
         run: |
-          echo "Applying root app-of-apps with PR branch override..."
+          echo "Applying ArgoCD applications with PR branch override..."
           # Get current branch name (works for both PRs and direct pushes)
           BRANCH="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
           echo "Using branch: $BRANCH"
 
-          # Modify root-app to use PR branch instead of HEAD (use | delimiter for branch names with /)
-          sed "s|targetRevision: HEAD|targetRevision: $BRANCH|g" argocd/applications/root-app.yaml > /tmp/root-app.yaml
-          cat /tmp/root-app.yaml
-          kubectl apply -f /tmp/root-app.yaml
-          echo "Root application applied with branch: $BRANCH"
+          # Create temp directory preserving structure
+          mkdir -p /tmp/argocd-patched
+
+          # Find all Application YAML files and patch targetRevision: HEAD -> PR branch
+          find argocd/applications -name "*.yaml" -type f | while read file; do
+            # Create output directory structure
+            dir=$(dirname "$file")
+            mkdir -p "/tmp/argocd-patched/$dir"
+            # Patch the file
+            sed "s|targetRevision: HEAD|targetRevision: $BRANCH|g" "$file" > "/tmp/argocd-patched/$file"
+            echo "Patched: $file"
+          done
+
+          # Show the patched root-app
+          echo ""
+          echo "=== Patched root-app.yaml ==="
+          cat /tmp/argocd-patched/argocd/applications/root-app.yaml
+
+          # Apply root-app first
+          kubectl apply -f /tmp/argocd-patched/argocd/applications/root-app.yaml
+
+          # Wait for root app to start creating child apps
+          sleep 10
+
+          # Apply ALL child Applications directly to ensure they use PR branch
+          # This overrides whatever root-app creates from git
+          echo ""
+          echo "=== Applying patched child applications ==="
+          find /tmp/argocd-patched/argocd/applications -name "*.yaml" -type f ! -name "root-app.yaml" | while read file; do
+            echo "Applying: $file"
+            kubectl apply -f "$file" 2>&1 || echo "  (will retry after dependencies)"
+          done
+
+          # Retry any that failed due to missing CRDs (AppProject not yet created)
+          sleep 5
+          echo ""
+          echo "=== Retrying any failed applications ==="
+          find /tmp/argocd-patched/argocd/applications -name "*.yaml" -type f ! -name "root-app.yaml" | while read file; do
+            kubectl apply -f "$file" 2>&1 || true
+          done
+
+          echo ""
+          echo "All applications applied with branch: $BRANCH"
 
       - name: Wait for ArgoCD sync (platform layer)
         run: |
