@@ -41,16 +41,24 @@ cleanup_on_failure() {
 trap cleanup_on_failure EXIT
 
 # Wait for a namespace's pods to be ready
+# Returns 0 on success, 1 on timeout (with warning)
 wait_for_namespace() {
     local namespace="$1"
     local timeout="${2:-180}"
     local label="${3:-}"
 
     if [ -n "$label" ]; then
-        kubectl wait --for=condition=Ready pods -l "$label" -n "$namespace" --timeout="${timeout}s" 2>/dev/null || true
+        if ! kubectl wait --for=condition=Ready pods -l "$label" -n "$namespace" --timeout="${timeout}s" 2>/dev/null; then
+            log_warn "Timeout waiting for pods with label '$label' in $namespace"
+            return 1
+        fi
     else
-        kubectl wait --for=condition=Ready pods --all -n "$namespace" --timeout="${timeout}s" 2>/dev/null || true
+        if ! kubectl wait --for=condition=Ready pods --all -n "$namespace" --timeout="${timeout}s" 2>/dev/null; then
+            log_warn "Timeout waiting for all pods in $namespace"
+            return 1
+        fi
     fi
+    return 0
 }
 
 # Print URL summary

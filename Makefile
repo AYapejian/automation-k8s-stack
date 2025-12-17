@@ -365,6 +365,9 @@ stack-status: ## Show overall stack health status
 test: ## Run all integration tests (requires running cluster)
 	@$(SCRIPTS_DIR)/run-all-tests.sh
 
+helm-test: ## Run Helm tests for deployed charts (requires running cluster)
+	@$(SCRIPTS_DIR)/helm-test.sh
+
 lint: ## Run YAML linting checks
 	@echo "Running yamllint..."
 	@if command -v yamllint >/dev/null 2>&1; then \

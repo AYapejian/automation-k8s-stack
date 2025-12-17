@@ -56,16 +56,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install prerequisites
+      - name: Create k3d cluster
+        uses: AbsaOSS/k3d-action@v2.4.0
+        with:
+          cluster-name: automation-k8s
+          args: --config clusters/k3d/cluster-config.yaml
+
+      - name: Install Helm and tools
         run: |
-          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
           curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          k3d version
           helm version
           jq --version
-
-      - name: Create k3d cluster
-        run: make cluster-up
 
       # ===== ARGOCD GITOPS DEPLOYMENT =====
       - name: Bootstrap ArgoCD
@@ -148,6 +149,13 @@ jobs:
         run: |
           chmod +x scripts/argocd-health-test.sh
           scripts/argocd-health-test.sh
+
+      # ===== HELM TESTS =====
+      # Run Helm tests for charts that have built-in test suites
+      - name: Run Helm tests
+        run: |
+          chmod +x scripts/helm-test.sh
+          scripts/helm-test.sh
 
       # ===== VERIFICATION TESTS =====
       - name: Verify Istio mTLS
@@ -234,10 +242,14 @@ jobs:
         if: always()
         run: |
           echo "=== Final Stack Status ==="
-          kubectl get pods -A | grep -v "Completed" || true
+          if ! kubectl get pods -A 2>/dev/null | grep -v "Completed"; then
+            echo "Warning: Could not retrieve pod status"
+          fi
           echo ""
           echo "=== Helm Releases ==="
-          helm list -A || true
+          if ! helm list -A 2>/dev/null; then
+            echo "Warning: Could not retrieve Helm releases"
+          fi
 
       - name: Cleanup
         if: always()
