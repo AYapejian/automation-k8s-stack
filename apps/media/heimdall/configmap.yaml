@@ -1,0 +1,150 @@
+# Heimdall Services Configuration
+# This ConfigMap documents all cluster services to add to Heimdall dashboard
+# Add these services through the Heimdall UI at https://heimdall.localhost:8443
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: heimdall-services
+  namespace: media
+  labels:
+    app.kubernetes.io/name: heimdall
+    app.kubernetes.io/component: dashboard
+data:
+  # Service catalog for Heimdall dashboard configuration
+  # These are the URLs to add as applications in Heimdall
+  services.yaml: |
+    # ============================================
+    # Cluster Services for Heimdall Dashboard
+    # ============================================
+    # Add these services in Heimdall UI (Items > Add)
+    # Use "Application Type: Generic" for custom links
+    # or select the matching app type for enhanced features
+    #
+    # All services accessible via https://<name>.localhost:8443
+    # ============================================
+
+    # --- Observability Stack ---
+    observability:
+      - name: Grafana
+        url: https://grafana.localhost:8443
+        type: Grafana  # Enhanced app - shows dashboards
+        icon: grafana
+        description: Metrics visualization and dashboards
+
+      - name: Prometheus
+        url: https://prometheus.localhost:8443
+        type: Generic
+        icon: prometheus
+        description: Metrics collection and alerting
+
+      - name: Jaeger
+        url: https://jaeger.localhost:8443
+        type: Generic
+        icon: jaeger
+        description: Distributed tracing UI
+
+    # --- Home Automation Stack ---
+    home_automation:
+      - name: Home Assistant
+        url: https://homeassistant.localhost:8443
+        type: HomeAssistant  # Enhanced app
+        icon: home-assistant
+        description: Home automation control center
+
+      - name: Homebridge
+        url: https://homebridge.localhost:8443
+        type: Generic
+        icon: homebridge
+        description: HomeKit bridge for non-HomeKit devices
+
+      - name: Zigbee2MQTT
+        url: https://zigbee2mqtt.localhost:8443
+        type: Generic
+        icon: zigbee2mqtt
+        description: Zigbee device management
+
+    # --- Media Stack ---
+    media:
+      - name: Sonarr
+        url: https://sonarr.localhost:8443
+        type: Sonarr  # Enhanced app - shows queue status
+        icon: sonarr
+        description: TV show management and automation
+
+      - name: Radarr
+        url: https://radarr.localhost:8443
+        type: Radarr  # Enhanced app - shows queue status
+        icon: radarr
+        description: Movie management and automation
+
+      - name: NZBGet
+        url: https://nzbget.localhost:8443
+        type: NZBGet  # Enhanced app - shows download status
+        icon: nzbget
+        description: Usenet downloader
+
+    # --- Platform Services ---
+    platform:
+      - name: ArgoCD
+        url: https://argocd.localhost:8443
+        type: Generic
+        icon: argocd
+        description: GitOps continuous delivery
+
+      - name: Minio Console
+        url: https://minio.localhost:8443
+        type: Generic
+        icon: minio
+        description: S3-compatible object storage console
+
+    # --- Sample/Test Applications ---
+    samples:
+      - name: httpbin
+        url: https://httpbin.localhost:8443
+        type: Generic
+        icon: api
+        description: HTTP request/response testing
+
+  # Quick setup instructions
+  README.md: |
+    # Heimdall Dashboard Setup
+
+    ## Accessing Heimdall
+    Navigate to: https://heimdall.localhost:8443
+
+    ## Adding Services
+
+    1. Click "Items" in the bottom bar
+    2. Click "Add" button
+    3. Search for the application type (e.g., "Grafana", "Sonarr")
+    4. Fill in the URL from the services list above
+    5. Click "Save"
+
+    ## Enhanced Apps
+
+    The following apps have enhanced support with live statistics:
+    - Grafana: Shows dashboard count
+    - Home Assistant: Shows entity count
+    - Sonarr: Shows queue status
+    - Radarr: Shows queue status
+    - NZBGet: Shows download status
+
+    For enhanced apps, you may need to provide API keys in the
+    application settings.
+
+    ## Service URLs (k3d Development)
+
+    | Service        | URL                                    |
+    |----------------|----------------------------------------|
+    | Heimdall       | https://heimdall.localhost:8443        |
+    | Grafana        | https://grafana.localhost:8443         |
+    | Prometheus     | https://prometheus.localhost:8443      |
+    | Jaeger         | https://jaeger.localhost:8443          |
+    | Home Assistant | https://homeassistant.localhost:8443   |
+    | Homebridge     | https://homebridge.localhost:8443      |
+    | Zigbee2MQTT    | https://zigbee2mqtt.localhost:8443     |
+    | Sonarr         | https://sonarr.localhost:8443          |
+    | Radarr         | https://radarr.localhost:8443          |
+    | NZBGet         | https://nzbget.localhost:8443          |
+    | ArgoCD         | https://argocd.localhost:8443          |
+    | Minio          | https://minio.localhost:8443           |

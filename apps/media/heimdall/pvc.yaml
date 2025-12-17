@@ -1,0 +1,16 @@
+# Heimdall config storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: heimdall-config
+  namespace: media
+  labels:
+    app.kubernetes.io/name: heimdall
+    app.kubernetes.io/component: dashboard
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: local-path
