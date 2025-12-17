@@ -1,0 +1,41 @@
+# HomeAssistant production patches for k3s
+# - USB device passthrough for hardware integrations
+# - Increased resources for production workload
+# - Preferred node affinity for USB-equipped nodes
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homeassistant
+  namespace: home-automation
+spec:
+  template:
+    spec:
+      containers:
+        - name: homeassistant
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          # Uncomment to enable USB passthrough (requires privileged)
+          # securityContext:
+          #   privileged: true
+          # volumeMounts:
+          #   - name: usb-devices
+          #     mountPath: /dev/serial
+      # volumes:
+      #   - name: usb-devices
+      #     hostPath:
+      #       path: /dev/serial
+      #       type: Directory
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: hardware/usb
+                    operator: In
+                    values: ["true"]

@@ -1,0 +1,18 @@
+# Homebridge production patches for k3s
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homebridge
+  namespace: home-automation
+spec:
+  template:
+    spec:
+      containers:
+        - name: homebridge
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

@@ -1,0 +1,28 @@
+# Helm values for NFS CSI Driver
+# Install with: helm install csi-driver-nfs csi-driver-nfs/csi-driver-nfs -n kube-system -f nfs-csi-values.yaml
+
+controller:
+  replicas: 1
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+
+node:
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+
+# Enable snapshots if your NFS server supports it
+externalSnapshotter:
+  enabled: false  # Set to true if NFS server supports snapshots
+
+# Storage class provisioning is handled separately
+# See platform/storage/k3s/nas-storageclass.yaml

@@ -332,16 +332,16 @@ Implementation:
 - [x] CI validates ArgoCD-based deployment
 
 ### 6.2 k3s Deployment Overlays
-**Branch**: `feature/k3s-overlays`
+**Branch**: `feature/6.2-k3s-overlays`
 
 - Kustomize overlays for k3s environment
-- Real NAS StorageClass
-- Production Sealed Secrets keypair
+- Real NAS StorageClass (NFS CSI driver)
+- Production Sealed Secrets keypair workflow
 - Node labels for hardware affinity
 
 **Acceptance Criteria**:
-- [ ] Manifests render correctly for k3s
-- [ ] Documented deployment process
+- [x] Manifests render correctly for k3s
+- [x] Documented deployment process (clusters/k3s/README.md)
 
 ### 6.3 Hardware Affinity Configurations
 **Branch**: `feature/hardware-affinity`
