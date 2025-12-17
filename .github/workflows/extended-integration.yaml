@@ -137,7 +137,7 @@ jobs:
 
       - name: Wait for ArgoCD sync (observability layer)
         run: |
-          # Helper function: check ArgoCD app status
+          # Helper function: check ArgoCD app status with full details
           check_argocd_app() {
             local app="$1"
             local sync=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
@@ -148,6 +148,19 @@ jobs:
             if [[ -n "$message" && "$message" != "null" ]]; then
               echo "  Message: $message"
             fi
+            # Show conditions if any (includes errors)
+            local conditions=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.conditions}' 2>/dev/null || echo "")
+            if [[ -n "$conditions" && "$conditions" != "null" && "$conditions" != "[]" ]]; then
+              echo "  Conditions: $conditions"
+            fi
+            # Show source status for multi-source apps
+            local sourceStatus=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.sourceStatus}' 2>/dev/null || echo "")
+            if [[ -n "$sourceStatus" && "$sourceStatus" != "null" ]]; then
+              echo "  Source Status: $sourceStatus"
+            fi
+            # Check for refresh errors
+            local refreshErr=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.reconciledAt}' 2>/dev/null || echo "")
+            echo "  Last Reconciled: $refreshErr"
           }
 
           # Helper function: wait for ArgoCD app to sync with diagnostics
@@ -189,6 +202,12 @@ jobs:
 
             echo "Timeout waiting for $description to sync"
             check_argocd_app "$app"
+            echo ""
+            echo "=== ArgoCD repo-server logs (last 30 lines) ==="
+            kubectl logs deployment/argocd-repo-server -n argocd --tail=30 2>/dev/null || echo "Could not get repo-server logs"
+            echo ""
+            echo "=== ArgoCD application-controller logs (last 30 lines) ==="
+            kubectl logs statefulset/argocd-application-controller -n argocd --tail=30 2>/dev/null || echo "Could not get controller logs"
             return 1
           }
 
