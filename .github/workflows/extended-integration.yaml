@@ -83,49 +83,20 @@ jobs:
           kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argocd-application-controller -n argocd --timeout=180s
           echo "ArgoCD is ready"
 
+      # Configure root app to use the current PR branch for testing
+      # This ensures ArgoCD fetches Application definitions from PR, not main
       - name: Apply root application
         run: |
-          echo "Applying root app-of-apps..."
-          kubectl apply -f argocd/applications/root-app.yaml
-          echo "Root application applied"
+          echo "Applying root app-of-apps with PR branch override..."
+          # Get current branch name (works for both PRs and direct pushes)
+          BRANCH="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          echo "Using branch: $BRANCH"
 
-      # CI workaround: ArgoCD fetches from main branch, but we need to test PR changes
-      # Patch prometheus-grafana to disable admission webhooks (prevents hook race condition)
-      # See: https://github.com/prometheus-community/helm-charts/issues/4500
-      - name: Patch prometheus-grafana for CI
-        run: |
-          echo "Waiting for prometheus-grafana Application to be created..."
-          timeout 120 bash -c 'until kubectl get application prometheus-grafana -n argocd 2>/dev/null; do sleep 5; done'
-
-          # Show current Application spec before patching
-          echo "Current prometheus-grafana Application spec:"
-          kubectl get application prometheus-grafana -n argocd -o yaml | head -50
-
-          echo "Patching prometheus-grafana to disable admission webhooks..."
-          kubectl patch application prometheus-grafana -n argocd --type=json -p='[
-            {
-              "op": "add",
-              "path": "/spec/sources/0/helm/valuesObject",
-              "value": {
-                "prometheusOperator": {
-                  "admissionWebhooks": {
-                    "enabled": false
-                  }
-                }
-              }
-            }
-          ]'
-
-          echo "Patch applied, triggering hard refresh..."
-          kubectl patch application prometheus-grafana -n argocd --type=merge -p='{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
-
-          # Wait for ArgoCD to start processing the refresh
-          echo "Waiting for ArgoCD to process the refresh..."
-          sleep 15
-
-          # Verify patch was applied and show updated spec
-          echo "Updated prometheus-grafana Application spec:"
-          kubectl get application prometheus-grafana -n argocd -o jsonpath='{.spec.sources[0].helm}' | jq '.' 2>/dev/null || kubectl get application prometheus-grafana -n argocd -o jsonpath='{.spec.sources[0].helm}'
+          # Modify root-app to use PR branch instead of HEAD
+          sed "s/targetRevision: HEAD/targetRevision: $BRANCH/g" argocd/applications/root-app.yaml > /tmp/root-app.yaml
+          cat /tmp/root-app.yaml
+          kubectl apply -f /tmp/root-app.yaml
+          echo "Root application applied with branch: $BRANCH"
 
       - name: Wait for ArgoCD sync (platform layer)
         run: |
