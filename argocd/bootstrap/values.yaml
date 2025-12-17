@@ -48,15 +48,16 @@ server:
       memory: 256Mi
 
 # Repo Server (clones repos, generates manifests)
+# Higher memory needed for large Helm charts like kube-prometheus-stack
 repoServer:
   replicas: 1
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 200m
+      cpu: 100m
       memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 # ApplicationSet Controller (generates Applications from templates)
 applicationSet:
