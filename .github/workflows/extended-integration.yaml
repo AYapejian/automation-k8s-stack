@@ -467,6 +467,31 @@ jobs:
             echo "Warning: Could not retrieve Helm releases"
           fi
 
+      - name: Debug stuck pods
+        if: failure()
+        run: |
+          echo "=== Debugging pods not in Running/Completed state ==="
+          # Find pods that are not running or completed
+          PROBLEM_PODS=$(kubectl get pods -A -o json | jq -r '.items[] | select(.status.phase != "Running" and .status.phase != "Succeeded") | "\(.metadata.namespace)/\(.metadata.name)"')
+          if [ -n "$PROBLEM_PODS" ]; then
+            for pod in $PROBLEM_PODS; do
+              ns=$(echo "$pod" | cut -d'/' -f1)
+              name=$(echo "$pod" | cut -d'/' -f2)
+              echo ""
+              echo "=== Describing $ns/$name ==="
+              kubectl describe pod "$name" -n "$ns" 2>/dev/null | tail -50 || true
+              echo ""
+              echo "=== Logs for $ns/$name ==="
+              kubectl logs "$name" -n "$ns" --all-containers --tail=30 2>/dev/null || echo "No logs available"
+            done
+          else
+            echo "All pods are in Running or Succeeded state"
+          fi
+
+          echo ""
+          echo "=== ArgoCD controller status ==="
+          kubectl describe pod -l app.kubernetes.io/name=argocd-application-controller -n argocd 2>/dev/null | tail -30 || true
+
       - name: Cleanup
         if: always()
         run: |
