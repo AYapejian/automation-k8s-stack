@@ -1,0 +1,18 @@
+# Radarr service
+apiVersion: v1
+kind: Service
+metadata:
+  name: radarr
+  namespace: media
+  labels:
+    app.kubernetes.io/name: radarr
+    app.kubernetes.io/component: movie-management
+spec:
+  type: ClusterIP
+  ports:
+    - port: 7878
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: radarr

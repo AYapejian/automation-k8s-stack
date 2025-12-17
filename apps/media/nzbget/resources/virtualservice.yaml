@@ -1,0 +1,21 @@
+# VirtualService routes traffic from Gateway to nzbget
+# Accessible at https://nzbget.localhost:8443
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: nzbget
+  namespace: media
+spec:
+  hosts:
+    - "nzbget.localhost"
+  gateways:
+    - istio-ingress/main-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: nzbget.media.svc.cluster.local
+            port:
+              number: 6789

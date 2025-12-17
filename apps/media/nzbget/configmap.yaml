@@ -1,0 +1,15 @@
+# nzbget configuration
+# Default config with secure defaults for containerized deployment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nzbget-config
+  namespace: media
+  labels:
+    app.kubernetes.io/name: nzbget
+    app.kubernetes.io/component: downloader
+data:
+  # nzbget will generate its config on first run
+  # These environment variables configure the container
+  NZBGET_USER: "nzbget"
+  NZBGET_PASS: "tegbzn6789"  # Default password - change in production via sealed secret

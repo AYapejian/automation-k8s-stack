@@ -1,0 +1,18 @@
+# Shared downloads PVC for media stack
+# nzbget downloads here, sonarr/radarr import from here
+# In k3s production, this would be NAS-backed storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: media-downloads
+  namespace: media
+  labels:
+    app.kubernetes.io/name: media-downloads
+    app.kubernetes.io/component: shared-storage
+spec:
+  accessModes:
+    - ReadWriteMany  # Multiple pods need access
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: local-path  # k3d default; override in k3s overlay

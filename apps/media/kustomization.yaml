@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: media
+
+resources:
+  # Namespace
+  - namespace.yaml
+
+  # Shared Storage for downloads
+  - shared-storage/downloads-pvc.yaml
+
+  # nzbget - Usenet downloader
+  - nzbget/configmap.yaml
+  - nzbget/pvc.yaml
+  - nzbget/service.yaml
+  - nzbget/deployment.yaml
+  - nzbget/resources/virtualservice.yaml
+
+  # Sonarr - TV show management
+  - sonarr/pvc.yaml
+  - sonarr/service.yaml
+  - sonarr/deployment.yaml
+  - sonarr/resources/servicemonitor.yaml
+  - sonarr/resources/virtualservice.yaml
+
+  # Radarr - Movie management
+  - radarr/pvc.yaml
+  - radarr/service.yaml
+  - radarr/deployment.yaml
+  - radarr/resources/servicemonitor.yaml
+  - radarr/resources/virtualservice.yaml

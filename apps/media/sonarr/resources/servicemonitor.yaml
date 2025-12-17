@@ -1,0 +1,23 @@
+# ServiceMonitor for Sonarr metrics
+# Sonarr exposes metrics at /api/v3/health (basic) and via exportarr sidecar for full metrics
+# This basic monitor checks the health endpoint
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: sonarr
+  namespace: media
+  labels:
+    app.kubernetes.io/name: sonarr
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sonarr
+  namespaceSelector:
+    matchNames:
+      - media
+  endpoints:
+    - port: http
+      path: /ping
+      interval: 30s
+      scrapeTimeout: 10s

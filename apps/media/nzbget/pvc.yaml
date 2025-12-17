@@ -1,0 +1,16 @@
+# nzbget config storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nzbget-config
+  namespace: media
+  labels:
+    app.kubernetes.io/name: nzbget
+    app.kubernetes.io/component: downloader
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: local-path

@@ -1,0 +1,22 @@
+# ServiceMonitor for Radarr metrics
+# Radarr exposes a health check endpoint that can be monitored
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: radarr
+  namespace: media
+  labels:
+    app.kubernetes.io/name: radarr
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: radarr
+  namespaceSelector:
+    matchNames:
+      - media
+  endpoints:
+    - port: http
+      path: /ping
+      interval: 30s
+      scrapeTimeout: 10s
