@@ -223,6 +223,104 @@ wait_for_apps() {
     done
 }
 
+# Verify component-level health beyond ArgoCD status
+# This catches misconfigurations that ArgoCD might not detect
+verify_component_health() {
+    log_section "Component Health Verification"
+
+    local component_failures=0
+
+    # Verify Istio mTLS is STRICT
+    log_info "Checking Istio mTLS configuration..."
+    local mtls_mode
+    mtls_mode=$(kubectl get peerauthentication default -n istio-system -o jsonpath='{.spec.mtls.mode}' 2>/dev/null || echo "NOTFOUND")
+    if [[ "$mtls_mode" == "STRICT" ]]; then
+        log_info "✓ Istio mTLS: STRICT mode enabled"
+    else
+        log_error "✗ Istio mTLS not STRICT (got: $mtls_mode)"
+        FAILED_APPS+=("istio-mtls-config")
+        ((component_failures++))
+    fi
+
+    # Verify cert-manager can issue certificates
+    log_info "Checking cert-manager certificate status..."
+    local cert_ready
+    cert_ready=$(kubectl get certificate gateway-tls -n istio-ingress -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
+    if [[ "$cert_ready" == "True" ]]; then
+        log_info "✓ Gateway TLS certificate: Ready"
+    else
+        log_error "✗ Gateway TLS certificate not ready (status: $cert_ready)"
+        FAILED_APPS+=("cert-manager-certificate")
+        ((component_failures++))
+    fi
+
+    # Verify ClusterIssuers exist and are ready
+    log_info "Checking ClusterIssuers..."
+    local issuers_ready
+    issuers_ready=$(kubectl get clusterissuers -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
+    if echo "$issuers_ready" | grep -q "True"; then
+        log_info "✓ ClusterIssuers: Ready"
+    else
+        log_warn "△ ClusterIssuers may not be ready"
+        DEGRADED_APPS+=("clusterissuers")
+    fi
+
+    # Verify Prometheus is running and has targets
+    log_info "Checking Prometheus status..."
+    local prometheus_pod
+    prometheus_pod=$(kubectl get pods -n observability -l app.kubernetes.io/name=prometheus -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    if [[ -n "$prometheus_pod" ]]; then
+        local prometheus_ready
+        prometheus_ready=$(kubectl get pod "$prometheus_pod" -n observability -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
+        if [[ "$prometheus_ready" == "True" ]]; then
+            log_info "✓ Prometheus: Running and ready"
+        else
+            log_warn "△ Prometheus pod not ready"
+            DEGRADED_APPS+=("prometheus-pod")
+        fi
+    else
+        log_error "✗ Prometheus pod not found"
+        FAILED_APPS+=("prometheus-pod")
+        ((component_failures++))
+    fi
+
+    # Verify Grafana is accessible
+    log_info "Checking Grafana status..."
+    local grafana_pod
+    grafana_pod=$(kubectl get pods -n observability -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    if [[ -n "$grafana_pod" ]]; then
+        local grafana_ready
+        grafana_ready=$(kubectl get pod "$grafana_pod" -n observability -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
+        if [[ "$grafana_ready" == "True" ]]; then
+            log_info "✓ Grafana: Running and ready"
+        else
+            log_warn "△ Grafana pod not ready"
+            DEGRADED_APPS+=("grafana-pod")
+        fi
+    else
+        log_error "✗ Grafana pod not found"
+        FAILED_APPS+=("grafana-pod")
+        ((component_failures++))
+    fi
+
+    # Verify Loki is accepting logs
+    log_info "Checking Loki status..."
+    local loki_ready
+    loki_ready=$(kubectl get pods -n observability -l app.kubernetes.io/name=loki -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
+    if [[ "$loki_ready" == "True" ]]; then
+        log_info "✓ Loki: Running and ready"
+    else
+        log_warn "△ Loki may not be ready"
+        DEGRADED_APPS+=("loki-pod")
+    fi
+
+    if [[ $component_failures -gt 0 ]]; then
+        log_error "Component verification found $component_failures critical issue(s)"
+    else
+        log_info "Component verification passed"
+    fi
+}
+
 # Print detailed failure info for debugging
 print_failure_details() {
     if [[ ${#FAILED_APPS[@]} -eq 0 ]]; then
@@ -276,6 +374,9 @@ main() {
     for app in "${WORKLOAD_APPS[@]}"; do
         check_app "$app" "optional"
     done
+
+    # Component-level verification
+    verify_component_health
 
     # Summary
     log_section "Test Summary"

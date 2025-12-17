@@ -159,12 +159,17 @@ install_gateway() {
     # - autoscaling: enabled 1-5 replicas
     # - resources: 100m/128Mi requests (reasonable for k3d)
 
+    # Pod labels must match Gateway selector (istio: gateway)
+    # Without this, the Gateway resource cannot find pods to route traffic to
+    local label_args="--set labels.istio=gateway"
+
     if release_exists "istio-ingress" "${ISTIO_INGRESS_NAMESPACE}"; then
         log_info "istio-ingress already installed, upgrading..."
         helm upgrade istio-ingress istio/gateway \
             -n "${ISTIO_INGRESS_NAMESPACE}" \
             --version "${ISTIO_VERSION}" \
             --skip-schema-validation \
+            ${label_args} \
             $(get_upgrade_flags) \
             --wait --timeout 5m
     else
@@ -172,6 +177,7 @@ install_gateway() {
             -n "${ISTIO_INGRESS_NAMESPACE}" \
             --version "${ISTIO_VERSION}" \
             --skip-schema-validation \
+            ${label_args} \
             --wait --timeout 5m
     fi
 }

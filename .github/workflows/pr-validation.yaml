@@ -43,16 +43,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install prerequisites
+      - name: Create k3d cluster
+        uses: AbsaOSS/k3d-action@v2.4.0
+        with:
+          cluster-name: automation-k8s
+          k3d-version: v5.7.4
+          args: --config clusters/k3d/cluster-config.yaml
+
+      - name: Install Helm and tools
         run: |
-          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
           curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          k3d version
           helm version
           jq --version
-
-      - name: Create k3d cluster
-        run: make cluster-up
 
       # ===== PLATFORM LAYER =====
       - name: Install Istio
@@ -89,10 +91,45 @@ jobs:
 
       - name: Test ingress routing
         run: |
-          kubectl wait --for=condition=Ready pods -l app=httpbin -n ingress-sample --timeout=120s
-          # Test HTTPS
-          RESPONSE=$(curl -sk -H "Host: httpbin.localhost" https://localhost:8443/get)
-          echo "$RESPONSE" | jq -e '.url' && echo "HTTPS routing verified"
+          kubectl wait --for=condition=Ready pods -l app=httpbin -n ingress-sample --timeout=60s
+
+          # Verify TLS secret exists (pre-requisite for HTTPS)
+          echo "Verifying TLS secret..."
+          kubectl get secret gateway-tls-secret -n istio-ingress || {
+            echo "TLS secret not found - certificate may not have issued"
+            exit 1
+          }
+
+          # Verify Gateway pod has correct label for selector match
+          echo "Verifying Gateway pod labels..."
+          kubectl get pods -n istio-ingress -l istio=gateway --no-headers || {
+            echo "No pods with label istio=gateway found!"
+            kubectl get pods -n istio-ingress --show-labels
+            exit 1
+          }
+
+          # Test HTTPS with retries (config propagation typically < 15s)
+          echo "Testing HTTPS ingress..."
+          ROUTING_VERIFIED=false
+          for i in {1..3}; do
+            RESPONSE=$(curl -sk -H "Host: httpbin.localhost" https://localhost:8443/get 2>/dev/null || true)
+            if echo "$RESPONSE" | jq -e '.url' >/dev/null 2>&1; then
+              echo "HTTPS routing verified on attempt $i"
+              ROUTING_VERIFIED=true
+              break
+            fi
+            echo "Retry $i/3..."
+            sleep 5
+          done
+
+          if [ "$ROUTING_VERIFIED" != "true" ]; then
+            echo "HTTPS routing failed"
+            echo "Response: $RESPONSE"
+            kubectl get pods -n istio-ingress -o wide
+            kubectl get gateway -A
+            exit 1
+          fi
+
           # Verify sidecar injection
           CONTAINERS=$(kubectl get pod -l app=httpbin -n ingress-sample -o jsonpath='{.items[0].spec.containers[*].name}')
           echo "$CONTAINERS" | grep -q "istio-proxy" && echo "Sidecar injection verified"
@@ -102,10 +139,14 @@ jobs:
         if: always()
         run: |
           echo "=== Final Stack Status ==="
-          kubectl get pods -A | grep -v "Completed" || true
+          if ! kubectl get pods -A 2>/dev/null | grep -v "Completed"; then
+            echo "Warning: Could not retrieve pod status"
+          fi
           echo ""
           echo "=== Helm Releases ==="
-          helm list -A || true
+          if ! helm list -A 2>/dev/null; then
+            echo "Warning: Could not retrieve Helm releases"
+          fi
 
       - name: Cleanup
         if: always()
