@@ -26,15 +26,17 @@ configs:
     server.insecure: true
 
 # Application controller (syncs applications)
+# Higher memory needed when reconciling large charts like kube-prometheus-stack
+# which generates 100+ resources that all need comparison with live state
 controller:
   replicas: 1
   resources:
     requests:
       cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
       memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
 
 # API Server
 server:
@@ -48,15 +50,16 @@ server:
       memory: 256Mi
 
 # Repo Server (clones repos, generates manifests)
+# Higher memory needed for large Helm charts like kube-prometheus-stack
 repoServer:
   replicas: 1
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 200m
+      cpu: 100m
       memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 # ApplicationSet Controller (generates Applications from templates)
 applicationSet:

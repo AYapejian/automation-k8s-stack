@@ -83,11 +83,58 @@ jobs:
           kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argocd-application-controller -n argocd --timeout=180s
           echo "ArgoCD is ready"
 
+      # Configure all ArgoCD apps to use the current PR branch for testing
+      # This ensures ArgoCD fetches Application definitions AND values from PR, not main
       - name: Apply root application
         run: |
-          echo "Applying root app-of-apps..."
-          kubectl apply -f argocd/applications/root-app.yaml
-          echo "Root application applied"
+          echo "Applying ArgoCD applications with PR branch override..."
+          # Get current branch name (works for both PRs and direct pushes)
+          BRANCH="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          echo "Using branch: $BRANCH"
+
+          # Create temp directory preserving structure
+          mkdir -p /tmp/argocd-patched
+
+          # Find all Application YAML files and patch targetRevision: HEAD -> PR branch
+          find argocd/applications -name "*.yaml" -type f | while read file; do
+            # Create output directory structure
+            dir=$(dirname "$file")
+            mkdir -p "/tmp/argocd-patched/$dir"
+            # Patch the file
+            sed "s|targetRevision: HEAD|targetRevision: $BRANCH|g" "$file" > "/tmp/argocd-patched/$file"
+            echo "Patched: $file"
+          done
+
+          # Show the patched root-app
+          echo ""
+          echo "=== Patched root-app.yaml ==="
+          cat /tmp/argocd-patched/argocd/applications/root-app.yaml
+
+          # Apply root-app first
+          kubectl apply -f /tmp/argocd-patched/argocd/applications/root-app.yaml
+
+          # Wait for root app to start creating child apps
+          sleep 10
+
+          # Apply ALL child Applications directly to ensure they use PR branch
+          # This overrides whatever root-app creates from git
+          echo ""
+          echo "=== Applying patched child applications ==="
+          find /tmp/argocd-patched/argocd/applications -name "*.yaml" -type f ! -name "root-app.yaml" | while read file; do
+            echo "Applying: $file"
+            kubectl apply -f "$file" 2>&1 || echo "  (will retry after dependencies)"
+          done
+
+          # Retry any that failed due to missing CRDs (AppProject not yet created)
+          sleep 5
+          echo ""
+          echo "=== Retrying any failed applications ==="
+          find /tmp/argocd-patched/argocd/applications -name "*.yaml" -type f ! -name "root-app.yaml" | while read file; do
+            kubectl apply -f "$file" 2>&1 || true
+          done
+
+          echo ""
+          echo "All applications applied with branch: $BRANCH"
 
       - name: Wait for ArgoCD sync (platform layer)
         run: |
@@ -137,6 +184,80 @@ jobs:
 
       - name: Wait for ArgoCD sync (observability layer)
         run: |
+          # Helper function: check ArgoCD app status with full details
+          check_argocd_app() {
+            local app="$1"
+            local sync=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+            local health=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+            local phase=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "Unknown")
+            local message=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.operationState.message}' 2>/dev/null || echo "")
+            echo "$app: sync=$sync, health=$health, phase=$phase"
+            if [[ -n "$message" && "$message" != "null" ]]; then
+              echo "  Message: $message"
+            fi
+            # Show conditions if any (includes errors)
+            local conditions=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.conditions}' 2>/dev/null || echo "")
+            if [[ -n "$conditions" && "$conditions" != "null" && "$conditions" != "[]" ]]; then
+              echo "  Conditions: $conditions"
+            fi
+            # Show source status for multi-source apps
+            local sourceStatus=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.sourceStatus}' 2>/dev/null || echo "")
+            if [[ -n "$sourceStatus" && "$sourceStatus" != "null" ]]; then
+              echo "  Source Status: $sourceStatus"
+            fi
+            # Check for refresh errors
+            local refreshErr=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.reconciledAt}' 2>/dev/null || echo "")
+            echo "  Last Reconciled: $refreshErr"
+          }
+
+          # Helper function: wait for ArgoCD app to sync with diagnostics
+          wait_for_argocd_app() {
+            local app="$1"
+            local timeout="${2:-300}"
+            local description="${3:-$app}"
+
+            echo "Waiting for $description ArgoCD app to sync..."
+            local elapsed=0
+            while [[ $elapsed -lt $timeout ]]; do
+              local sync=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+              local health=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+              local phase=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "Unknown")
+
+              # Check for sync errors or failures
+              if [[ "$phase" == "Failed" || "$phase" == "Error" ]]; then
+                echo "ERROR: $description sync failed!"
+                check_argocd_app "$app"
+                # Show detailed conditions
+                kubectl get application "$app" -n argocd -o jsonpath='{.status.conditions}' 2>/dev/null | jq '.' || true
+                return 1
+              fi
+
+              # Check if synced and ready (Healthy or Progressing is acceptable for large charts)
+              if [[ "$sync" == "Synced" && ("$health" == "Healthy" || "$health" == "Progressing") ]]; then
+                echo "$description synced (health: $health)"
+                return 0
+              fi
+
+              # Progress update every 30s
+              if (( elapsed % 30 == 0 )); then
+                echo "  [$elapsed/${timeout}s] $app: sync=$sync, health=$health, phase=$phase"
+              fi
+
+              sleep 10
+              elapsed=$((elapsed + 10))
+            done
+
+            echo "Timeout waiting for $description to sync"
+            check_argocd_app "$app"
+            echo ""
+            echo "=== ArgoCD repo-server logs (last 30 lines) ==="
+            kubectl logs deployment/argocd-repo-server -n argocd --tail=30 2>/dev/null || echo "Could not get repo-server logs"
+            echo ""
+            echo "=== ArgoCD application-controller logs (last 30 lines) ==="
+            kubectl logs statefulset/argocd-application-controller -n argocd --tail=30 2>/dev/null || echo "Could not get controller logs"
+            return 1
+          }
+
           # Helper function: wait for pods to exist, then wait for them to be ready
           wait_for_pods() {
             local namespace="$1"
@@ -166,10 +287,32 @@ jobs:
           echo "Waiting for observability namespace..."
           timeout 180 bash -c 'until kubectl get ns observability 2>/dev/null; do sleep 5; done'
 
-          # Wait for Prometheus (sync wave 10) - needs longer timeout for ArgoCD to sync Helm chart
+          # Wait for prometheus-grafana ArgoCD app to sync first
+          echo ""
+          echo "=== Checking ArgoCD observability apps status ==="
+          check_argocd_app "prometheus-grafana-prereqs"
+          check_argocd_app "prometheus-grafana"
+          check_argocd_app "prometheus-grafana-resources"
+          check_argocd_app "loki"
+          echo ""
+
+          # Wait for ArgoCD to sync prometheus-grafana (non-fatal - pods are what matters)
+          # kube-prometheus-stack is a large chart and sync can take a while
+          wait_for_argocd_app "prometheus-grafana" 420 "Prometheus/Grafana" || {
+            echo "WARNING: prometheus-grafana ArgoCD sync didn't complete, checking pods instead"
+            check_argocd_app "prometheus-grafana"
+          }
+
+          # Debug: show what's in observability namespace
+          echo "=== Current observability namespace state ==="
+          kubectl get all -n observability 2>/dev/null || echo "Namespace may not exist yet"
+          echo ""
+
+          # Wait for Prometheus pods (kube-prometheus-stack is slow to start)
+          # This is the real test - pods being ready means the chart deployed successfully
           wait_for_pods "observability" "app.kubernetes.io/name=prometheus" 240 "Prometheus"
 
-          # Wait for Grafana (sync wave 10)
+          # Wait for Grafana pods
           wait_for_pods "observability" "app.kubernetes.io/name=grafana" 180 "Grafana"
 
           echo "Observability layer synced"
@@ -323,6 +466,31 @@ jobs:
           if ! helm list -A 2>/dev/null; then
             echo "Warning: Could not retrieve Helm releases"
           fi
+
+      - name: Debug stuck pods
+        if: failure()
+        run: |
+          echo "=== Debugging pods not in Running/Completed state ==="
+          # Find pods that are not running or completed
+          PROBLEM_PODS=$(kubectl get pods -A -o json | jq -r '.items[] | select(.status.phase != "Running" and .status.phase != "Succeeded") | "\(.metadata.namespace)/\(.metadata.name)"')
+          if [ -n "$PROBLEM_PODS" ]; then
+            for pod in $PROBLEM_PODS; do
+              ns=$(echo "$pod" | cut -d'/' -f1)
+              name=$(echo "$pod" | cut -d'/' -f2)
+              echo ""
+              echo "=== Describing $ns/$name ==="
+              kubectl describe pod "$name" -n "$ns" 2>/dev/null | tail -50 || true
+              echo ""
+              echo "=== Logs for $ns/$name ==="
+              kubectl logs "$name" -n "$ns" --all-containers --tail=30 2>/dev/null || echo "No logs available"
+            done
+          else
+            echo "All pods are in Running or Succeeded state"
+          fi
+
+          echo ""
+          echo "=== ArgoCD controller status ==="
+          kubectl describe pod -l app.kubernetes.io/name=argocd-application-controller -n argocd 2>/dev/null | tail -30 || true
 
       - name: Cleanup
         if: always()

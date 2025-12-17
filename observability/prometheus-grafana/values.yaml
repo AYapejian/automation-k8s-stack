@@ -93,6 +93,16 @@ prometheusOperator:
     limits:
       cpu: 200m
       memory: 256Mi
+  # Disable admission webhooks for k3d development
+  # Admission webhooks validate Prometheus/Alertmanager CRs but aren't essential for local dev
+  # This avoids ArgoCD hook race condition (github.com/prometheus-community/helm-charts/issues/4500)
+  admissionWebhooks:
+    enabled: false
+  # Disable TLS on operator when admission webhooks are disabled
+  # The operator's TLS secret is the same as the admission webhook secret
+  # See: https://github.com/prometheus-community/helm-charts/issues/418
+  tls:
+    enabled: false
 
 # kube-state-metrics
 kube-state-metrics:

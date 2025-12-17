@@ -22,7 +22,7 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: security
       server: https://kubernetes.default.svc
-    - namespace: sample
+    - namespace: ingress-sample
       server: https://kubernetes.default.svc
 
   # Workloads don't need cluster-wide resources
