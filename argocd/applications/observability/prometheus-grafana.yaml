@@ -20,11 +20,15 @@ spec:
         valueFiles:
           - $values/observability/prometheus-grafana/values.yaml
         # Inline overrides - these take precedence over valueFiles
-        # Disable admission webhooks to avoid ArgoCD hook race condition
+        # Disable admission webhooks and TLS to avoid ArgoCD hook race condition
+        # TLS must be disabled because operator mounts the admission webhook secret
         # See: https://github.com/prometheus-community/helm-charts/issues/4500
+        # See: https://github.com/prometheus-community/helm-charts/issues/418
         valuesObject:
           prometheusOperator:
             admissionWebhooks:
+              enabled: false
+            tls:
               enabled: false
     # Values from this repo
     - repoURL: https://github.com/AYapejian/automation-k8s-stack.git
