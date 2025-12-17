@@ -276,8 +276,13 @@ jobs:
           # Wait for ArgoCD to sync prometheus-grafana with detailed diagnostics
           wait_for_argocd_app "prometheus-grafana" 300 "Prometheus/Grafana"
 
-          # Wait for Prometheus pods
-          wait_for_pods "observability" "app.kubernetes.io/name=prometheus" 120 "Prometheus"
+          # Debug: show what's in observability namespace
+          echo "=== Current observability namespace state ==="
+          kubectl get all -n observability 2>/dev/null || echo "Namespace may not exist yet"
+          echo ""
+
+          # Wait for Prometheus pods (kube-prometheus-stack is slow to start)
+          wait_for_pods "observability" "app.kubernetes.io/name=prometheus" 180 "Prometheus"
 
           # Wait for Grafana pods
           wait_for_pods "observability" "app.kubernetes.io/name=grafana" 120 "Grafana"
