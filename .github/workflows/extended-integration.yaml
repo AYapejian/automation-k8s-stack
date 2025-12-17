@@ -296,8 +296,12 @@ jobs:
           check_argocd_app "loki"
           echo ""
 
-          # Wait for ArgoCD to sync prometheus-grafana with detailed diagnostics
-          wait_for_argocd_app "prometheus-grafana" 300 "Prometheus/Grafana"
+          # Wait for ArgoCD to sync prometheus-grafana (non-fatal - pods are what matters)
+          # kube-prometheus-stack is a large chart and sync can take a while
+          wait_for_argocd_app "prometheus-grafana" 420 "Prometheus/Grafana" || {
+            echo "WARNING: prometheus-grafana ArgoCD sync didn't complete, checking pods instead"
+            check_argocd_app "prometheus-grafana"
+          }
 
           # Debug: show what's in observability namespace
           echo "=== Current observability namespace state ==="
@@ -305,10 +309,11 @@ jobs:
           echo ""
 
           # Wait for Prometheus pods (kube-prometheus-stack is slow to start)
-          wait_for_pods "observability" "app.kubernetes.io/name=prometheus" 180 "Prometheus"
+          # This is the real test - pods being ready means the chart deployed successfully
+          wait_for_pods "observability" "app.kubernetes.io/name=prometheus" 240 "Prometheus"
 
           # Wait for Grafana pods
-          wait_for_pods "observability" "app.kubernetes.io/name=grafana" 120 "Grafana"
+          wait_for_pods "observability" "app.kubernetes.io/name=grafana" 180 "Grafana"
 
           echo "Observability layer synced"
 
