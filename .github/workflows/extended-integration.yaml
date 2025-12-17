@@ -128,10 +128,10 @@ jobs:
           timeout 180 bash -c 'until kubectl get ns cert-manager 2>/dev/null; do sleep 5; done'
           wait_for_pods "cert-manager" "app.kubernetes.io/instance=cert-manager" 180 "cert-manager"
 
-          # Wait for Istio gateway (sync wave 4)
+          # Wait for Istio gateway (sync wave 4) - needs longer timeout as ArgoCD may still be syncing
           echo "Waiting for istio-ingress namespace..."
-          timeout 120 bash -c 'until kubectl get ns istio-ingress 2>/dev/null; do sleep 5; done'
-          wait_for_pods "istio-ingress" "app=istio-ingress" 120 "Istio gateway"
+          timeout 180 bash -c 'until kubectl get ns istio-ingress 2>/dev/null; do sleep 5; done'
+          wait_for_pods "istio-ingress" "app=istio-gateway" 240 "Istio gateway"
 
           echo "Platform layer synced"
 
