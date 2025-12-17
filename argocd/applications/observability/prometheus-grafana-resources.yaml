@@ -1,12 +1,12 @@
 # Prometheus/Grafana Resources - ServiceMonitors, PodMonitors, Dashboards, VirtualServices
-# Sync Wave 10: After Prometheus/Grafana Helm release
+# Sync Wave 11: After Prometheus/Grafana Helm release creates CRDs
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: prometheus-grafana-resources
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/sync-wave: "11"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
