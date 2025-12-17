@@ -20,6 +20,7 @@ spec:
     - 'https://vmware-tanzu.github.io/helm-charts'
 
   # Allowed destination namespaces for platform components
+  # Note: kube-system is required for cert-manager leader election RBAC
   destinations:
     - namespace: istio-system
       server: https://kubernetes.default.svc
@@ -32,6 +33,8 @@ spec:
     - namespace: minio
       server: https://kubernetes.default.svc
     - namespace: velero
+      server: https://kubernetes.default.svc
+    - namespace: kube-system
       server: https://kubernetes.default.svc
 
   # Allow cluster-wide resources (CRDs, ClusterRoles, etc.)

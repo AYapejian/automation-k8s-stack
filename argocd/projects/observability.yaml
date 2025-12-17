@@ -19,8 +19,11 @@ spec:
     - 'https://open-telemetry.github.io/opentelemetry-helm-charts'
 
   # Allowed destination namespaces for observability components
+  # Note: kube-system is required for kube-prometheus-stack to scrape coredns and create Services
   destinations:
     - namespace: observability
+      server: https://kubernetes.default.svc
+    - namespace: kube-system
       server: https://kubernetes.default.svc
 
   # Allow cluster-wide resources (ServiceMonitors use cluster scope sometimes)
