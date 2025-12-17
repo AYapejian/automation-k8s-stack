@@ -51,7 +51,7 @@ jobs:
     name: Extended Integration
     runs-on: ubuntu-latest
     needs: lint
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -164,10 +164,10 @@ jobs:
 
           # Wait for observability namespace
           echo "Waiting for observability namespace..."
-          timeout 120 bash -c 'until kubectl get ns observability 2>/dev/null; do sleep 5; done'
+          timeout 180 bash -c 'until kubectl get ns observability 2>/dev/null; do sleep 5; done'
 
-          # Wait for Prometheus (sync wave 10)
-          wait_for_pods "observability" "app.kubernetes.io/name=prometheus" 180 "Prometheus"
+          # Wait for Prometheus (sync wave 10) - needs extra time for Helm chart to deploy
+          wait_for_pods "observability" "app.kubernetes.io/name=prometheus" 300 "Prometheus"
 
           # Wait for Grafana (sync wave 10)
           wait_for_pods "observability" "app.kubernetes.io/name=grafana" 180 "Grafana"
