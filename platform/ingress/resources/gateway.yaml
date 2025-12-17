@@ -16,7 +16,7 @@ metadata:
   namespace: istio-ingress
 spec:
   selector:
-    istio: ingress  # Matches istio-ingress deployment labels
+    istio: gateway  # Matches istio-gateway helm chart default labels
   servers:
     # HTTP server - redirects all traffic to HTTPS
     - port:
