@@ -93,6 +93,13 @@ prometheusOperator:
     limits:
       cpu: 200m
       memory: 256Mi
+  # ArgoCD hook annotations to prevent admission webhook Job race condition
+  # See: https://github.com/prometheus-community/helm-charts/issues/4500
+  admissionWebhooks:
+    patch:
+      annotations:
+        argocd.argoproj.io/hook: PreSync
+        argocd.argoproj.io/hook-delete-policy: HookFailed
 
 # kube-state-metrics
 kube-state-metrics:
