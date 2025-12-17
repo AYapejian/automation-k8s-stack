@@ -12,14 +12,11 @@ resources:
     cpu: 100m
     memory: 128Mi
 
-# Loki endpoint
+# Loki endpoint and scrape configs
 config:
   clients:
     - url: http://loki.observability.svc.cluster.local:3100/loki/api/v1/push
       tenant_id: ""  # No multi-tenancy for local dev
-
-# Scrape configs
-config:
   snippets:
     # Add common labels
     common:
