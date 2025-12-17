@@ -1,0 +1,59 @@
+# yamllint configuration
+# See https://yamllint.readthedocs.io/en/stable/configuration.html
+
+extends: default
+
+rules:
+  # Line length - allow longer lines for Kubernetes manifests
+  line-length:
+    max: 200
+    level: warning
+
+  # Allow --- at start of file
+  document-start: disable
+
+  # Comments formatting
+  comments:
+    require-starting-space: true
+    min-spaces-from-content: 1
+
+  # Indentation
+  indentation:
+    spaces: 2
+    indent-sequences: true
+
+  # Allow empty values (common in Kubernetes)
+  empty-values: enable
+
+  # Truthy values - allow yes/no for Kubernetes
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no']
+    check-keys: false
+
+  # Brackets
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 0
+
+  # Braces
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 0
+
+  # Colons
+  colons:
+    max-spaces-before: 0
+    max-spaces-after: -1
+
+  # Commas
+  commas:
+    max-spaces-before: 0
+    min-spaces-after: 1
+    max-spaces-after: 1
+
+# Ignore specific paths
+ignore: |
+  .git/
+  node_modules/
+  .claude/
+  .tmp/

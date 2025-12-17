@@ -334,14 +334,28 @@ stack-status: ## Show overall stack health status
 
 ##@ Testing
 
-test: ## Run all tests
-	@echo "TODO: Implement in Phase 1.3"
-	@exit 1
+test: ## Run all integration tests (requires running cluster)
+	@$(SCRIPTS_DIR)/run-all-tests.sh
 
-lint: ## Run linting checks
-	@echo "Checking YAML files..."
-	@find . -name '*.yaml' -o -name '*.yml' | xargs -I {} echo "Found: {}"
-	@echo "Lint check placeholder - will add yamllint in future"
+lint: ## Run YAML linting checks
+	@echo "Running yamllint..."
+	@if command -v yamllint >/dev/null 2>&1; then \
+		yamllint -c .yamllint.yaml . && echo "YAML lint: PASSED"; \
+	else \
+		echo "Warning: yamllint not installed. Install with: pip install yamllint"; \
+		echo "Falling back to basic YAML syntax check..."; \
+		find . -name '*.yaml' -o -name '*.yml' | grep -v '.git' | while read file; do \
+			python3 -c "import yaml; yaml.safe_load(open('$$file'))" 2>/dev/null || echo "Warning: $$file may have issues"; \
+		done; \
+		echo "Basic YAML check complete"; \
+	fi
+
+lint-fix: ## Show yamllint issues with suggestions
+	@if command -v yamllint >/dev/null 2>&1; then \
+		yamllint -c .yamllint.yaml -f parsable . || true; \
+	else \
+		echo "yamllint not installed. Install with: pip install yamllint"; \
+	fi
 
 ##@ Cleanup
 

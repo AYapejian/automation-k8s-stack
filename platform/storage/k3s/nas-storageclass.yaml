@@ -16,7 +16,7 @@ metadata:
   annotations:
     description: "NFS storage backed by NAS device - k3s production only"
 provisioner: nfs.csi.k8s.io  # Requires NFS CSI driver
-parameters:
+parameters: {}
   # These parameters need to be configured for your NFS server
   # server: "nas.local"
   # share: "/volume1/kubernetes"
