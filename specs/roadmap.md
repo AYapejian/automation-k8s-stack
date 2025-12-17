@@ -304,6 +304,23 @@ k3d: Deploy with CPU-only config, no actual camera streams.
 - [ ] Metrics exported
 - [ ] GPU scheduling works in k3s (future)
 
+### 5.4 Heimdall Dashboard
+**Branch**: `feature/5.3-heimdall-dashboard`
+
+Components:
+- Heimdall application dashboard (linuxserver/heimdall)
+
+Central start page with links to all cluster services:
+- Observability: Grafana, Prometheus, Jaeger
+- Home Automation: HomeAssistant, Homebridge, Zigbee2MQTT
+- Media: Sonarr, Radarr, NZBGet
+- Platform: ArgoCD, Minio
+
+**Acceptance Criteria**:
+- [x] Heimdall accessible via ingress (https://heimdall.localhost:8443)
+- [x] ConfigMap documents all cluster service URLs
+- [x] Enhanced app support for Grafana, Sonarr, Radarr, NZBGet
+
 ---
 
 ## Phase 6: Production Readiness

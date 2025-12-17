@@ -6,6 +6,7 @@ Media management components deployed with Istio service mesh integration.
 
 | Component | Description | Port | Ingress URL |
 |-----------|-------------|------|-------------|
+| Heimdall | Application dashboard / start page | 80 | https://heimdall.localhost:8443 |
 | nzbget | Usenet downloader | 6789 | https://nzbget.localhost:8443 |
 | Sonarr | TV show management | 8989 | https://sonarr.localhost:8443 |
 | Radarr | Movie management | 7878 | https://radarr.localhost:8443 |
@@ -97,3 +98,36 @@ For full metrics, consider adding [Exportarr](https://github.com/onedr0p/exporta
 - Default nzbget password should be changed in production via Sealed Secret
 - Sonarr/Radarr should have authentication enabled in production
 - All inter-service communication is secured via Istio mTLS
+
+## Heimdall Dashboard
+
+Heimdall serves as the central start page for all cluster services. Access it at:
+https://heimdall.localhost:8443
+
+### Configuring Heimdall
+
+After deployment, add applications through the Heimdall UI:
+
+1. Click "Items" in the bottom bar
+2. Click "Add" button
+3. Search for the application type (e.g., "Grafana", "Sonarr")
+4. Enter the service URL
+5. Click "Save"
+
+### Cluster Services to Add
+
+| Category | Service | URL | Enhanced App |
+|----------|---------|-----|--------------|
+| **Observability** | Grafana | https://grafana.localhost:8443 | Yes |
+| | Prometheus | https://prometheus.localhost:8443 | No |
+| | Jaeger | https://jaeger.localhost:8443 | No |
+| **Home Automation** | Home Assistant | https://homeassistant.localhost:8443 | Yes |
+| | Homebridge | https://homebridge.localhost:8443 | No |
+| | Zigbee2MQTT | https://zigbee2mqtt.localhost:8443 | No |
+| **Media** | Sonarr | https://sonarr.localhost:8443 | Yes |
+| | Radarr | https://radarr.localhost:8443 | Yes |
+| | NZBGet | https://nzbget.localhost:8443 | Yes |
+| **Platform** | ArgoCD | https://argocd.localhost:8443 | No |
+| | Minio | https://minio.localhost:8443 | No |
+
+Enhanced apps can display live statistics when API keys are configured.

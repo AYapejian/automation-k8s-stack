@@ -30,3 +30,10 @@ resources:
   - radarr/deployment.yaml
   - radarr/resources/servicemonitor.yaml
   - radarr/resources/virtualservice.yaml
+
+  # Heimdall - Application dashboard / start page
+  - heimdall/configmap.yaml
+  - heimdall/pvc.yaml
+  - heimdall/service.yaml
+  - heimdall/deployment.yaml
+  - heimdall/resources/virtualservice.yaml
